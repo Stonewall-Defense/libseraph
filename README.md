@@ -25,3 +25,4 @@ conda deactivate
 ## TODO
 
 - Prevent a dataset from being "double-tapped"
+- Mark imports of partial datasets properly
