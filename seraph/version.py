@@ -70,6 +70,7 @@ def _has_version_data(dataset_dir=".") -> bool:
     fq_version_file = os.path.join(dataset_dir, SERAPH_INTERNAL_DIR, VERSION_FILENAME)
     return os.path.isfile(fq_version_file)
 
+
 def _check_highest_version_bump(prev: VersionBumpType, curr: VersionBumpType) -> VersionBumpType:
     if curr == VersionBumpType.MAJOR:
         return VersionBumpType.MAJOR
@@ -244,6 +245,11 @@ def mark_version_note(version_bump_type: VersionBumpType, change_type: ChangeTyp
 ###############################################################################
 @click.group("version")
 def version():
+    """
+        References:
+            https://common-changelog.org/
+            https://github.com/dslp/dslp/blob/main/semantic-versioning.md
+    """
     pass
 
 
