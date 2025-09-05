@@ -18,6 +18,7 @@ from tqdm import tqdm
 from .common import str_to_enum
 from .dataset import SeraphDataset
 from .provenance import ProvenanceActivityType, mark_provenance
+from .version import mark_version_note, VersionBumpType, ChangeType
 
 
 ###############################################################################
@@ -214,6 +215,9 @@ def train_test_splits(split_type: str,
 
     if SPLIT_COL_NAME not in fieldnames:
         fieldnames.append(SPLIT_COL_NAME)
+        splits_are_new = True
+    else:
+        splits_are_new = False
 
     if random_seed is not None:
         random.seed(random_seed)
@@ -236,6 +240,12 @@ def train_test_splits(split_type: str,
     if dataset.track_provenance():
         prov_str = f"Added test/train{'/validation' if have_validation_split else ''} splits in proportion {split_choice.value.replace('_', '/')}"
         mark_provenance(ProvenanceActivityType.MODIFIED, prov_str, dataset_dir)
+
+    if dataset.track_version():
+        bump_type = VersionBumpType.MINOR if splits_are_new else VersionBumpType.MAJOR
+        change_type = ChangeType.ADD if splits_are_new else ChangeType.CHANGE
+        message = f"Split test/train{'/validation' if have_validation_split else ''} in proportion {split_choice.value.replace('_', '/')}"
+        mark_version_note(bump_type, change_type, message, dataset_dir)
 
 
 @splits.command("fold")
@@ -264,6 +274,9 @@ def fold_splits(n_folds: int,
 
     if FOLD_COL_NAME not in fieldnames:
         fieldnames.append(FOLD_COL_NAME)
+        folds_are_new = True
+    else:
+        folds_are_new = False
 
     if random_seed is not None:
         random.seed(random_seed)
@@ -280,8 +293,14 @@ def fold_splits(n_folds: int,
     dataset.set_metadata_headers(fieldnames).set_metadata_records(metadata).save()
 
     if dataset.track_provenance():
-        prov_str = f"Added {n_folds}-validation with per-class DRR assignment"
+        prov_str = f"{'Added' if folds_are_new else 'Updated'} {n_folds}-validation with per-class DRR assignment"
         mark_provenance(ProvenanceActivityType.MODIFIED, prov_str, dataset_dir)
+
+    if dataset.track_version():
+        bump_type = VersionBumpType.MINOR if folds_are_new else VersionBumpType.MAJOR
+        change_type = ChangeType.ADD if folds_are_new else ChangeType.CHANGE
+        message = f"{n_folds}-validation with per-class DRR assignment"
+        mark_version_note(bump_type, change_type, message, dataset_dir)
 
 
 ###############################################################################

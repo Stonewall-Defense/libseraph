@@ -8,6 +8,7 @@ import click
 ###############################################################################
 from .dataset import SeraphDataset
 from .provenance import ProvenanceActivityType, mark_provenance
+from .version import mark_version_note, VersionBumpType, ChangeType
 
 
 ###############################################################################
@@ -61,12 +62,17 @@ def switch_classes(dataset_dir: str,
                          )
     dataset.save()
 
-    if dataset.track_provenance():
-        prov_str = f"Changed class column to {new_class_col}"
-        mark_provenance(ProvenanceActivityType.MODIFIED, prov_str, dataset_dir)
+    # Dataset governance
+    gov_str = f"Changed class column to {new_class_col}"
 
-        prov_str = f"Renamed previous class column to {new_name_for_current_class_col}"
-        mark_provenance(ProvenanceActivityType.MODIFIED, prov_str, dataset_dir)
+    if dataset.track_provenance():
+        mark_provenance(ProvenanceActivityType.MODIFIED, gov_str, dataset_dir)
+
+        prov_str2 = f"Renamed previous class column to {new_name_for_current_class_col}"
+        mark_provenance(ProvenanceActivityType.MODIFIED, prov_str2, dataset_dir)
+
+    if dataset.track_version():
+        mark_version_note(VersionBumpType.MAJOR, ChangeType.CHANGE, gov_str, dataset_dir)
 
 
 @classes.command("rename")
@@ -109,9 +115,14 @@ def rename_classes(dataset_dir: str,
                          )
     dataset.save()
 
+    # Dataset governance
+    gov_str = f"Renamed class {old_class_name} to {new_class_name}"
+
     if dataset.track_provenance():
-        prov_str = f"Renamed class {old_class_name} to {new_class_name}"
-        mark_provenance(ProvenanceActivityType.MODIFIED, prov_str, dataset_dir)
+        mark_provenance(ProvenanceActivityType.MODIFIED, gov_str, dataset_dir)
+
+    if dataset.track_version():
+        mark_version_note(VersionBumpType.MAJOR, ChangeType.CHANGE, gov_str, dataset_dir)
 
 
 @classes.command("merge")
@@ -159,13 +170,18 @@ def merge_classes(dataset_dir: str,
                          )
     dataset.save()
 
+    # Dataset governance
+    if len(classes_to_merge) > 1:
+        prefix = "es " + ", ".join(classes_to_merge)
+    else:
+        prefix = f" {classes_to_merge[0]}"
+    gov_str = f"Merged class{prefix} into {target_class_name}"
+
     if dataset.track_provenance():
-        if len(classes_to_merge) > 1:
-            prefix = "es " + ", ".join(classes_to_merge)
-        else:
-            prefix = f" {classes_to_merge[0]}"
-        prov_str = f"Merged class{prefix} into {target_class_name}"
-        mark_provenance(ProvenanceActivityType.MODIFIED, prov_str, dataset_dir)
+        mark_provenance(ProvenanceActivityType.MODIFIED, gov_str, dataset_dir)
+
+    if dataset.track_version():
+        mark_version_note(VersionBumpType.MAJOR, ChangeType.CHANGE, gov_str, dataset_dir)
 
 
 ###############################################################################

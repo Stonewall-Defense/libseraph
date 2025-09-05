@@ -1,13 +1,12 @@
 ###############################################################################
 # Global Imports
 ###############################################################################
+from datetime import datetime, timezone
 from enum import Enum
 import os
 import pathlib
 import re
-import shutil
 import sys
-from typing import Any
 
 
 ###############################################################################
@@ -15,6 +14,7 @@ from typing import Any
 ###############################################################################
 import click
 import requests
+from rich import print
 
 
 ###############################################################################
@@ -113,9 +113,12 @@ def _submit_activity(seraph: SeraphMetadata,
 
 
 def _clean_up_provenance(dataset_dir="."):
-    fq_prov_dir = os.path.join(dataset_dir, SERAPH_INTERNAL_DIR)
-    shutil.rmtree(fq_prov_dir)
+    fq_prov_file = os.path.join(dataset_dir, SERAPH_INTERNAL_DIR, PROV_FILENAME)
+    os.unlink(fq_prov_file)
 
+
+def _now():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 ###############################################################################
 # ! Exports
@@ -133,18 +136,46 @@ def mark_provenance(key: ProvenanceActivityType, value: str, dataset_dir="."):
 ###############################################################################
 # ! Commands
 ###############################################################################
-@click.command("prov")
+@click.group("prov")
+def prov():
+    pass
+
+
+@prov.command("show")
+@click.option("--dataset_dir", default=".")
+def show_prov(dataset_dir: str):
+    dataset = SeraphDataset(dataset_dir)
+    seraph = dataset.get_seraph_metadata()
+
+    prov = _load_prov(dataset_dir)
+
+    print(f"[bold white]{seraph.name} provenance updates as of {_now()}[/bold white]")
+
+    prov_used = prov[ProvenanceActivityType.USED]
+    if len(prov_used):
+        print("\n[bold green]Used[/bold green]")
+        for used in prov_used:
+            print(f"\t- {used}")
+
+    prov_modified = prov[ProvenanceActivityType.MODIFIED]
+    if len(prov_modified):
+        print("\n[bold blue]Modified[/bold blue]")
+        for mod in prov_modified:
+            print(f"\t- {mod}")
+
+
+@prov.command("submit")
 @click.option("--dataset_dir", default=".")
 @click.option("--activity_label", required=True)
 @click.option("--activity_keywords", multiple=True)
 @click.option("--prov_url", default="https://prospero.sift.net:8000")
 @click.option("--clean_up_provenance", default=True)
-def prov(dataset_dir: str,
-         activity_label: str,
-         activity_keywords: tuple[str],
-         prov_url: str,
-         clean_up_provenance: bool,
-         ):
+def submit_prov(dataset_dir: str,
+                activity_label: str,
+                activity_keywords: tuple[str],
+                prov_url: str,
+                clean_up_provenance: bool,
+                ):
     if not _has_provenance_data(dataset_dir):
         print("No provenance data recorded")
         sys.exit(1)

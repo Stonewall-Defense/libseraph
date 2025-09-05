@@ -26,6 +26,7 @@ import torchaudio
 from .common import REQUIRED_METADATA_FIELD_NAMES, str_to_enum
 from .dataset import SeraphDataset
 from .provenance import ProvenanceActivityType, mark_provenance
+from .version import mark_version_note, VersionBumpType, ChangeType
 
 
 ###############################################################################
@@ -75,6 +76,29 @@ METADATA_FIELDS_TO_STRIP = ["sample_rate", "num_channels"]
 ###############################################################################
 # Helpers
 ###############################################################################
+def _prune_remote_data_by_classes(remote_dataset: SeraphDataset,
+                                  class_select: Optional[list[str]],
+                                  class_exclude: Optional[list[str]],
+                                  ):
+    # Nothing to be done, so bail out
+    if not class_select and not class_exclude:
+        return
+
+    # These are mutually exclusive
+    if class_select:
+        select_fn = lambda cls: (cls in class_select)       # noqa
+    else:
+        select_fn = lambda cls: (cls not in class_exclude)  # noqa
+
+    classes = remote_dataset.get_classes()
+    _, metadata_records = remote_dataset.get_metadata()
+
+    new_classes = [c for c in classes if select_fn(c)]
+    new_metadata = [m for m in metadata_records if select_fn(m["class_name"])]
+
+    remote_dataset.set_classes(new_classes).set_metadata_records(new_metadata)
+
+
 def _merge_classes(local_dataset: SeraphDataset, remote_dataset: SeraphDataset) -> tuple[list[str], dict[int, int]]:
     local_classes = local_dataset.get_classes()
     if not isinstance(local_classes, list):
@@ -258,6 +282,8 @@ def _import_audio_dataset(local_dataset: SeraphDataset,
                           channel_merge_strat: AudioMixMergeStrategy,
                           sample_rate_merge_strat: AudioMixMergeStrategy,
                           subtype_value_merge_strat: AudioBaseMergeStrategy,
+                          class_select: Optional[list[str]],
+                          class_exclude: Optional[list[str]],
                           ):
     ####################
     # Get local and remote metadata
@@ -368,6 +394,8 @@ def _import_audio_dataset(local_dataset: SeraphDataset,
     ####################
     # Actually import the data
     ####################
+    _prune_remote_data_by_classes(remote_dataset, class_select, class_exclude)
+
     new_class_list, remote_class_mapping = _merge_classes(local_dataset, remote_dataset)
     fieldnames, local_meta_records, remote_meta_records = _merge_metadata(local_dataset, remote_dataset, metadata_field_merge_strat, new_class_list, remote_class_mapping)
     _combine_audio_data_files(local_dataset,
@@ -391,6 +419,9 @@ def _import_audio_dataset(local_dataset: SeraphDataset,
     if local_dataset.track_provenance():
         mark_provenance(ProvenanceActivityType.USED, remote_seraph.uri, local_dataset.get_dataset_root_dir())
 
+    if local_dataset.track_version():
+        mark_version_note(VersionBumpType.MAJOR, ChangeType.ADD, f"Added data from {remote_seraph.uri} to dataset")
+
 
 ###############################################################################
 # ! Commands
@@ -407,12 +438,16 @@ def audio():
 @click.option("--channel_merge_strat", default="reject", type=click.Choice(AUDIO_MIX_MERGE_STRATEGIES))
 @click.option("--sample_rate_merge_strat", default="reject", type=click.Choice(AUDIO_MIX_MERGE_STRATEGIES))
 @click.option("--subtype_value_merge_strat", default="reject", type=click.Choice(AUDIO_BASE_MERGE_STRATEGIES))
+@click.option("--class_select", multiple=True)
+@click.option("--class_exclude", multiple=True)
 def audio_import(import_dir: str,
                  metadata_field_merge_strat: str,
                  media_subtype_merge_strat: str,
                  channel_merge_strat: str,
                  sample_rate_merge_strat: str,
                  subtype_value_merge_strat: str,
+                 class_select: tuple[str],
+                 class_exclude: tuple[str],
                  ):
     local_dataset = SeraphDataset(".")
     remote_dataset = SeraphDataset(import_dir)
@@ -423,6 +458,9 @@ def audio_import(import_dir: str,
     sample_rate_merge_strat_fmt = str_to_enum(sample_rate_merge_strat, AudioMixMergeStrategy)
     subtype_value_merge_strat_fmt = str_to_enum(subtype_value_merge_strat, AudioBaseMergeStrategy)
 
+    if class_select and class_exclude:
+        raise ValueError("You cannot exclude and cherry-pick classes at the same time")
+
     _import_audio_dataset(local_dataset,
                           remote_dataset,
                           metadata_field_merge_strat_fmt,
@@ -430,6 +468,8 @@ def audio_import(import_dir: str,
                           channel_merge_strat_fmt,
                           sample_rate_merge_strat_fmt,
                           subtype_value_merge_strat_fmt,
+                          list(class_select) if class_select else None,
+                          list(class_exclude) if class_exclude else None,
                           )
 
 
@@ -471,6 +511,9 @@ def audio_add_duration(dataset_dir: str,
 
     if dataset.track_provenance():
         mark_provenance(ProvenanceActivityType.MODIFIED, "Added or updated audio duration column", data_dir)
+
+    if dataset.track_version():
+        mark_version_note(VersionBumpType.MINOR, ChangeType.ADD, "Added audio duration column", data_dir)
 
 
 ###############################################################################

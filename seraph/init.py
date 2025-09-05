@@ -104,11 +104,17 @@ def init(dataset_path: str):
         keywork_input = _get_input("Add keyword(s) to the dataset: ")
         if keywork_input:
             keywords.append(keywork_input)
+    
+    prov_tmp = _get_input("Track dataset provenance? [Y/n] ").strip()
+    track_provenance = (not prov_tmp) or prov_tmp.lower() == "y"
+
+    ver_tmp = _get_input("Track dataset version? [Y/n] ").strip()
+    track_version = (not ver_tmp) or ver_tmp.lower() == "y"
 
     # Write the file
     seraph_file_data = {
         "uri": dataset_id,
-        "version": "v0.1",
+        "version": "v0.0.0",
         "name": dataset_name,
         "author": {
             "uri": author_id,
@@ -125,6 +131,12 @@ def init(dataset_path: str):
 
     if license:
         seraph_file_data["license"] = license
+
+    if track_provenance or track_version:
+        seraph_file_data["governance"] = {
+            "provenance": track_provenance,
+            "version": track_version,
+        }
 
     fq_seraph_filename = os.path.join(dataset_path, SERAPH_FILENAME)
     with open(fq_seraph_filename, "x") as outfile:

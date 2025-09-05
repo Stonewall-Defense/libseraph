@@ -24,8 +24,8 @@ class DatasetAuthor:
 
 @dataclass
 class DatasetGovernance:
-    track_provenance: bool
-    track_version: bool
+    provenance: bool
+    version: bool
 
 
 @dataclass
@@ -60,8 +60,8 @@ def load_seraph_file(fq_filename: str) -> SeraphMetadata:
         author = None
 
     governance = DatasetGovernance(
-        track_provenance=seraph.get("governance", {}).get("provenance", False),
-        track_version=seraph.get("governance", {}).get("version", False),
+        provenance=seraph.get("governance", {}).get("provenance", False),
+        version=seraph.get("governance", {}).get("version", False),
     )
 
     media_type = seraph.get("mediaType", None)
@@ -191,10 +191,10 @@ class SeraphDataset:
             write_json(self.fq_class_filename, self.classes)
 
     def track_provenance(self):
-        return self.seraph_metadata.governance.track_provenance
+        return self.seraph_metadata.governance.provenance
 
     def track_version(self):
-        return self.seraph_metadata.governance.track_version
+        return self.seraph_metadata.governance.version
 
     ###########################################################################
     # Static Helpers
