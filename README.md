@@ -17,7 +17,13 @@ python3 exec.py classes merge --target_class_name 9x19 --classes_to_merge "9mm L
 python3 exec.py classes merge --target_class_name ".22LR" --classes_to_merge "0.22"
 python3 exec.py classes merge --target_class_name "7.62x39" --classes_to_merge "7.62x39mm"
 
-python3 exec.py prov  --activity_label "Make new gunshot dataset"
+python3 exec.py audio duration --metadata_column_conflict_strat replace
+python3 exec.py audio clip --clip_duration_secs 1 --dry_run
+
+python3 exec.py prov show
+python3 exec.py prov submit --activity_label "Make new gunshot dataset"
+
+python3 exec.py version show
 
 conda deactivate
 ```

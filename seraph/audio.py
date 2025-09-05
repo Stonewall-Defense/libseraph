@@ -3,6 +3,7 @@
 ###############################################################################
 from collections.abc import Iterable
 from copy import deepcopy
+from dataclasses import dataclass
 from enum import Enum
 import os
 import shutil
@@ -23,7 +24,7 @@ import torchaudio
 ###############################################################################
 # Local Imports
 ###############################################################################
-from .common import REQUIRED_METADATA_FIELD_NAMES, str_to_enum
+from .common import REQUIRED_METADATA_FIELD_NAMES, str_to_enum, write_csv
 from .dataset import SeraphDataset
 from .provenance import ProvenanceActivityType, mark_provenance
 from .version import mark_version_note, VersionBumpType, ChangeType
@@ -60,17 +61,42 @@ class MetadataColumnConflictStrategy(Enum):
     KEEP = "keep"
 
 
+class ClipEndStrategy(Enum):
+    EXTEND = "extend"
+    PARTIAL = "partial"
+    DISCARD = "discard"
+
+
 AUDIO_BASE_MERGE_STRATEGIES = [val.value for val in AudioBaseMergeStrategy]
 AUDIO_MIX_MERGE_STRATEGIES = [val.value for val in AudioMixMergeStrategy]
 
 METADATA_FIELD_MERGE_STRATEGIES = [val.value for val in MetadataFieldMergeStrategy]
 METADATA_COLUMN_CONFLICT_STRATEGIES = [val.value for val in MetadataColumnConflictStrategy]
 
+CLIP_END_STRAEGIES = [val.value for val in ClipEndStrategy]
+
+
+###############################################################################
+# Classes
+###############################################################################
+@dataclass
+class Clip:
+    clip_filename: str
+    start_secs: float
+    end_secs: float
+
+
+@dataclass
+class FileToClip:
+    filename: str
+    clips: list[Clip]
+
 
 ###############################################################################
 # Constants
 ###############################################################################
 METADATA_FIELDS_TO_STRIP = ["sample_rate", "num_channels"]
+DURATION_COL_DEFAULT_NAME = "duration_secs"
 
 
 ###############################################################################
@@ -413,14 +439,133 @@ def _import_audio_dataset(local_dataset: SeraphDataset,
                                seraph_metadata=local_seraph)
     local_dataset.save()
 
-    ####################
-    # Provenance (optional)
-    ####################
-    if local_dataset.track_provenance():
-        mark_provenance(ProvenanceActivityType.USED, remote_seraph.uri, local_dataset.get_dataset_root_dir())
 
-    if local_dataset.track_version():
-        mark_version_note(VersionBumpType.MAJOR, ChangeType.ADD, f"Added data from {remote_seraph.uri} to dataset")
+def _write_audio_clips(record: FileToClip, data_dir: str):
+    fq_input_filename = os.path.join(data_dir, record.filename)
+    audio, sr = torchaudio.load(fq_input_filename, normalize=True)
+
+    for clip in record.clips:
+        fq_output_filename = os.path.join(data_dir, clip.clip_filename)
+        start_frame = int(clip.start_secs * sr)
+        end_frame = int(clip.end_secs * sr)
+        new_wav = audio[:, start_frame:end_frame]
+
+        # TODO: Honor formats from `seraph.json` metadata
+        torchaudio.save(fq_output_filename, new_wav, sr, encoding="PCM_S", bits_per_sample=16)
+
+    os.unlink(fq_input_filename)
+
+
+def _clip_audio_files(dataset: SeraphDataset,
+                      clip_duration_secs: float,
+                      duration_col_name: str,
+                      end_strat: ClipEndStrategy,
+                      force: bool,
+                      dry_run: bool,
+                      ):
+    data_dir = dataset.get_data_dir()
+    headers, metadata_records = dataset.get_metadata()
+
+    have_duration_column = False
+    for h in headers:
+        if h == duration_col_name:
+            have_duration_column = True
+        elif h.lower().startswith("clip"):
+            message = f"Possible clip column found: {h}"
+            if force:
+                warnings.warn(message)
+            else:
+                raise ValueError(message)
+        elif h.lower().startswith("segment"):
+            message = f"Possible segment column found: {h}"
+            if force:
+                warnings.warn(message)
+            else:
+                raise ValueError(message)
+
+    if not have_duration_column:
+        raise ValueError("No duration column found")
+
+    headers.append("file_id")
+    headers.append("clip_id")
+
+    # Do the clipping
+    clipped_metadata = []
+    files_to_clip: list[FileToClip] = []
+
+    for record in metadata_records:
+        original_duration = float(record["duration_secs"])
+
+        duration = original_duration
+        original_filename = record["filename"]
+
+        filename_segs = original_filename.split(".")
+        filename_root = ".".join(filename_segs[:-1])
+        ext = filename_segs[-1]
+
+        clip_record = FileToClip(filename=original_filename, clips=[])
+        clip_id = 0
+        start_offset_secs = 0.0
+
+        while duration >= clip_duration_secs:
+            clip_filename = f"{filename_root}-{clip_id}.{ext}"
+
+            # Update metadata records
+            clip_meta = deepcopy(record)
+            clip_meta["duration_secs"] = str(clip_duration_secs)
+            clip_meta["filename"] = clip_filename
+            clip_meta["file_id"] = original_filename
+            clip_meta["clip_id"] = str(clip_id)
+            clipped_metadata.append(clip_meta)
+
+            # Assemble necessary fields for subsequent file clipping
+            end_offset_secs = start_offset_secs + clip_duration_secs
+            clip_record.clips.append(Clip(
+                clip_filename=clip_filename,
+                start_secs=start_offset_secs,
+                end_secs=end_offset_secs,
+            ))
+
+            # Update loop conditions
+            start_offset_secs = end_offset_secs
+            clip_id += 1
+            duration -= clip_duration_secs
+
+        if end_strat == ClipEndStrategy.EXTEND:
+            clipped_metadata[-1]["duration_secs"] = clip_duration_secs + duration
+            clip_record.clips[-1].end_secs += duration
+        elif end_strat == ClipEndStrategy.PARTIAL:  # Possible TODO: Clean up this path
+            clip_filename = f"{filename_root}-{clip_id}.{ext}"
+
+            # Update metadata records
+            clip_meta = deepcopy(record)
+            clip_meta["duration_secs"] = str(duration)
+            clip_meta["filename"] = clip_filename
+            clip_meta["file_id"] = original_filename
+            clip_meta["clip_id"] = str(clip_id)
+            clipped_metadata.append(clip_meta)
+
+            # Assemble necessary fields for subsequent file clipping
+            end_offset_secs = start_offset_secs + clip_duration_secs
+            clip_record.clips.append(Clip(
+                clip_filename=clip_filename,
+                start_secs=start_offset_secs,
+                end_secs=end_offset_secs,
+            ))
+        else:   # ClipEndStrategy.DISCARD
+            pass
+
+        files_to_clip.append(clip_record)
+
+    if not dry_run:
+        # Update the files
+        for record in tqdm(files_to_clip, "Clipping audio files"):
+            _write_audio_clips(record, data_dir)
+
+        # Save the dataset
+        dataset.set_metadata_headers(headers).set_metadata_records(clipped_metadata).save()
+    else:
+        write_csv("clipped_metadata.csv", headers, clipped_metadata)
 
 
 ###############################################################################
@@ -472,6 +617,15 @@ def audio_import(import_dir: str,
                           list(class_exclude) if class_exclude else None,
                           )
 
+    # Provenance
+    remote_uri = remote_dataset.get_seraph_metadata().uri
+
+    if local_dataset.track_provenance():
+        mark_provenance(ProvenanceActivityType.USED, remote_uri, local_dataset.get_dataset_root_dir())
+
+    if local_dataset.track_version():
+        mark_version_note(VersionBumpType.MAJOR, ChangeType.ADD, f"Added data from {remote_uri} to dataset")
+
 
 @audio.command("duration")
 @click.option("--dataset_dir", default=".")
@@ -483,16 +637,15 @@ def audio_add_duration(dataset_dir: str,
     fieldnames, metadata = dataset.get_metadata()
 
     col_strat = str_to_enum(metadata_column_conflict_strat, MetadataColumnConflictStrategy)
-    DURATION_COL_NAME = "duration_secs"
 
     duration_cols = [f for f in fieldnames if f.startswith("duration")]
     if col_strat == MetadataColumnConflictStrategy.REJECT and len(duration_cols):
         raise ValueError(f"Rejecting due to conflict on one or more duration columns: {duration_cols}")
-    elif col_strat == MetadataColumnConflictStrategy.KEEP and DURATION_COL_NAME not in fieldnames:
-        fieldnames.append(DURATION_COL_NAME)
+    elif col_strat == MetadataColumnConflictStrategy.KEEP and DURATION_COL_DEFAULT_NAME not in fieldnames:
+        fieldnames.append(DURATION_COL_DEFAULT_NAME)
     elif col_strat == MetadataColumnConflictStrategy.REPLACE:
         fieldnames = [f for f in fieldnames if f not in duration_cols]
-        fieldnames.append(DURATION_COL_NAME)
+        fieldnames.append(DURATION_COL_DEFAULT_NAME)
 
     data_dir = dataset.get_data_dir()
     for entry in tqdm(metadata, "Processing file durations"):
@@ -505,15 +658,47 @@ def audio_add_duration(dataset_dir: str,
             for c in duration_cols:
                 del entry[c]
 
-        entry[DURATION_COL_NAME] = f"{duration_secs:.03f}"
+        entry[DURATION_COL_DEFAULT_NAME] = f"{duration_secs:.03f}"
 
     dataset.set_metadata_headers(fieldnames).set_metadata_records(metadata).save()
 
+    # Provenance
     if dataset.track_provenance():
-        mark_provenance(ProvenanceActivityType.MODIFIED, "Added or updated audio duration column", data_dir)
+        mark_provenance(ProvenanceActivityType.MODIFIED, "Added or updated audio duration column", dataset_dir)
 
     if dataset.track_version():
-        mark_version_note(VersionBumpType.MINOR, ChangeType.ADD, "Added audio duration column", data_dir)
+        mark_version_note(VersionBumpType.MINOR, ChangeType.ADD, "Added audio duration column", dataset_dir)
+
+
+@audio.command("clip")
+@click.option("--clip_duration_secs", type=float, required=True)
+@click.option("--dataset_dir", default=".")
+@click.option("--duration_col_name", default=DURATION_COL_DEFAULT_NAME)
+@click.option("--clip_end_strategy", default="extend", type=click.Choice(CLIP_END_STRAEGIES), help="If a duration is not evenly divisible by clip_duration_secs, what happens to the last clip?")
+@click.option("--force", is_flag=True)
+@click.option("--dry_run", is_flag=True)
+def audio_clip_files(clip_duration_secs: float,
+                     dataset_dir: str,
+                     duration_col_name: str,
+                     clip_end_strategy: str,
+                     force: bool,
+                     dry_run: bool,
+                     ):
+    end_strat = str_to_enum(clip_end_strategy, ClipEndStrategy)
+
+    dataset = SeraphDataset(dataset_dir)
+
+    _clip_audio_files(dataset, clip_duration_secs, duration_col_name, end_strat, force, dry_run)
+
+    # Data governance
+    if not dry_run:
+        gov_str = f"Clipped audio to {clip_duration_secs:.02f} secs"
+
+        if dataset.track_provenance():
+            mark_provenance(ProvenanceActivityType.MODIFIED, gov_str, dataset_dir)
+
+        if dataset.track_version():
+            mark_version_note(VersionBumpType.MINOR, ChangeType.CHANGE, gov_str)
 
 
 ###############################################################################

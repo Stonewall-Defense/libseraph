@@ -1,15 +1,7 @@
 ###############################################################################
 # Global Imports
 ###############################################################################
-from dataclasses import dataclass
-from datetime import datetime
-from enum import Enum
-import io
 import os
-import pathlib
-import re
-import sys
-from typing import Optional
 
 ###############################################################################
 # 3PP Imports
@@ -20,8 +12,9 @@ from rich import print
 ###############################################################################
 # Local Imports
 ###############################################################################
-from .common import SERAPH_INTERNAL_DIR, str_to_enum
 from .dataset import SeraphDataset
+from .provenance import ProvenanceActivityType, mark_provenance
+from .version import mark_version_note, VersionBumpType, ChangeType
 
 
 ###############################################################################
@@ -30,6 +23,7 @@ from .dataset import SeraphDataset
 @click.group("prune")
 def prune():
     pass
+
 
 @prune.command("files")
 @click.option("--dataset_dir", default=".")
@@ -74,6 +68,15 @@ def prune_records(dataset_dir: str, dry_run: bool):
             del metadata_records[idx]
         dataset.set_metadata_records(metadata_records)
         dataset.save()
+
+        # Data governance
+        gov_str = f"Pruned {len(idx_to_remove)} records without corresponding files"
+
+        if dataset.track_provenance():
+            mark_provenance(ProvenanceActivityType.MODIFIED, gov_str, dataset_dir)
+
+        if dataset.track_version():
+            mark_version_note(VersionBumpType.PATCH, ChangeType.REMOVE, gov_str)
 
 
 ###############################################################################
