@@ -216,7 +216,7 @@ def merge_classes(dataset_dir: str,
     # Save everything
     dataset.set_multiple(metadata_headers=fields,
                          metadata_records=metadata,
-                         classes=class_list,
+                         classes=new_class_list,
                          )
     dataset.save()
 
