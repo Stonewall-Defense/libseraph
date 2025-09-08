@@ -70,7 +70,8 @@ def _has_media_subtype(arg: str) -> bool:
 ###############################################################################
 @click.command("init")
 @click.option("--dataset_path", default=".")
-def init(dataset_path: str):
+@click.option("--override", default=False)
+def init(dataset_path: str, override: bool):
     # Get the metadata fields from the user
     dataset_id = _get_input("Enter a dataset ID: ")
     if not dataset_id:
@@ -143,10 +144,16 @@ def init(dataset_path: str):
         outfile.write(json.dumps(seraph_file_data, indent=2))
 
     fq_class_filename = os.path.join(dataset_path, CLASSFILE_NAME)
-    write_json(fq_class_filename, [])
+    if os.path.isfile(fq_class_filename) and not override:
+        raise RuntimeError("Class file already exists")
+    else:
+        write_json(fq_class_filename, [])
 
     fq_metadata_filename = os.path.join(dataset_path, PREFERRED_METADATA_FILENAME)
-    write_csv(fq_metadata_filename, REQUIRED_METADATA_FIELD_NAMES, [])
+    if os.path.isfile(fq_metadata_filename) and not override:
+        raise RuntimeError("Metadata file already exists")
+    else:
+        write_csv(fq_metadata_filename, REQUIRED_METADATA_FIELD_NAMES, [])
 
     fq_data_dirname = os.path.join(dataset_path, DATA_DIR)
     pathlib.Path(fq_data_dirname).mkdir(parents=True, exist_ok=True)

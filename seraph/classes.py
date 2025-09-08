@@ -2,6 +2,7 @@
 # Global Imports
 ###############################################################################
 from fractions import Fraction
+import os
 from typing import Optional
 
 ###############################################################################
@@ -14,6 +15,7 @@ from rich.table import Column, Table
 ###############################################################################
 # Local Imports
 ###############################################################################
+from .common import CLASSFILE_NAME, get_metadata_filename, read_csv, write_csv, write_json
 from .dataset import SeraphDataset
 from .provenance import ProvenanceActivityType, mark_provenance
 from .version import mark_version_note, VersionBumpType, ChangeType
@@ -253,6 +255,37 @@ def classes_check_balance(dataset_dir: str, len_col_name: Optional[str]):
         mapped_class_totals[cls] += siz
 
     _pprint_class_balance(class_list, mapped_class_totals)
+
+
+@classes.command("add-to-dataset")
+@click.option("--dataset_dir", default=".")
+@click.option("--compose_col", multiple=True)
+@click.option("--separator_char", default=" ")
+def classes_add_to_dataset(dataset_dir: str, compose_col: tuple[str], separator_char: str):
+    fq_class_file = os.path.join(dataset_dir, CLASSFILE_NAME)
+    classes_tmp = set()
+
+    metadata_filename = get_metadata_filename(dataset_dir)
+    fq_metadata_file = os.path.join(dataset_dir, metadata_filename)
+    headers, metadata = read_csv(fq_metadata_file)
+
+    if not all([c in headers for c in compose_col]):
+        raise ValueError("At least one compose_col is not present in the metadata")
+
+    for record in metadata:
+        class_name = separator_char.join([record[c] for c in compose_col])
+        classes_tmp.add(class_name)
+        record["class_name"] = class_name
+
+    class_list = sorted(list(classes_tmp))
+    write_json(fq_class_file, class_list)
+
+    headers.insert(0, "class_id")
+    headers.insert(1, "class_name")
+    for r in metadata:
+        r["class_id"] = str(class_list.index(r["class_name"]))
+
+    write_csv(fq_metadata_file, headers, metadata)
 
 
 ###############################################################################
