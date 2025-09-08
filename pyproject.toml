@@ -1,0 +1,13 @@
+[project]
+name = "seraph"
+version = "v0.1.0"
+
+[project.scripts]
+seraph = "seraph.exec:cli"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["seraph*"]

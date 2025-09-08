@@ -6,13 +6,13 @@ import click
 ###############################################################################
 # Local Imports
 ###############################################################################
-from seraph.audio import audio
-from seraph.classes import classes
-from seraph.init import init
-from seraph.provenance import prov
-from seraph.prune import prune
-from seraph.splits import splits
-from seraph.version import version
+from .audio import audio
+from .classes import classes
+from .init import init
+from .provenance import prov
+from .prune import prune
+from .splits import splits
+from .version import version
 
 
 ###############################################################################
