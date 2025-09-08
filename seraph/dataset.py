@@ -46,9 +46,9 @@ class SeraphMetadata:
 
 
 ###############################################################################
-# Functions
+# Helpers
 ###############################################################################
-def load_seraph_file(fq_filename: str) -> SeraphMetadata:
+def _load_seraph_file(fq_filename: str) -> SeraphMetadata:
     seraph = read_json(fq_filename)
 
     if seraph.get("author", None):
@@ -100,7 +100,7 @@ class SeraphDataset:
         self.metadata_was_updated = False
 
         self.fq_seraph_filename = os.path.join(self.dir, SERAPH_FILENAME)
-        self.seraph_metadata = load_seraph_file(self.fq_seraph_filename)
+        self.seraph_metadata = _load_seraph_file(self.fq_seraph_filename)
         self.seraph_was_updated = False
 
         self.fq_class_filename = os.path.join(self.dir, CLASSFILE_NAME)
