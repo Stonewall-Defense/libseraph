@@ -3,6 +3,7 @@
 ###############################################################################
 from fractions import Fraction
 import os
+import re
 from typing import Optional
 
 ###############################################################################
@@ -15,7 +16,7 @@ from rich.table import Column, Table
 ###############################################################################
 # Local Imports
 ###############################################################################
-from .common import CLASSFILE_NAME, get_metadata_filename, read_csv, write_csv, write_json
+from .common import CLASSFILE_NAME, get_input, get_metadata_filename, read_csv, write_csv, write_json
 from .dataset import SeraphDataset
 from .provenance import ProvenanceActivityType, mark_provenance
 from .version import mark_version_note, VersionBumpType, ChangeType
@@ -228,6 +229,64 @@ def merge_classes(dataset_dir: str,
     else:
         prefix = f" {classes_to_merge[0]}"
     gov_str = f"Merged class{prefix} into {target_class_name}"
+
+    if dataset.track_provenance():
+        mark_provenance(ProvenanceActivityType.MODIFIED, gov_str, dataset_dir)
+
+    if dataset.track_version():
+        mark_version_note(VersionBumpType.MAJOR, ChangeType.CHANGE, gov_str, dataset_dir)
+
+
+@classes.command("regex-merge")
+@click.option("--dataset_dir", default=".")
+@click.option("--target_class_name", required=True)
+@click.option("--sort_classes", default=True)
+def merge_classes_regex(dataset_dir: str,
+                        target_class_name: str,
+                        sort_classes: bool,
+                        ):
+    # Setup
+    dataset = SeraphDataset(dataset_dir)
+    fields, metadata = dataset.get_metadata()
+    class_list = dataset.get_classes()
+
+    class_merge_regex = get_input("Class merge regex: ")
+
+    # Sanity checks
+    if not len(metadata):
+        raise NotImplementedError("For now, there must be metadata in the file to execute this operation")
+    elif not len(class_merge_regex):
+        raise ValueError("Must specify a regex to capture classes")
+
+    pattern = re.compile(class_merge_regex)
+
+    # Generate new metadata
+    new_class_list = [c for c in class_list if not re.match(pattern, c)]
+
+    if target_class_name not in new_class_list:
+        new_class_list.append(target_class_name)
+
+    if sort_classes:
+        new_class_list.sort()
+
+    # Process old metadata
+    for entry in metadata:
+        old_entry_class_name = entry["class_name"]
+        entry_class_name = target_class_name if re.match(pattern, old_entry_class_name) else old_entry_class_name
+        entry_class_id = new_class_list.index(entry_class_name)
+
+        entry["class_id"] = str(entry_class_id)
+        entry["class_name"] = entry_class_name
+
+    # Save everything
+    dataset.set_multiple(metadata_headers=fields,
+                         metadata_records=metadata,
+                         classes=new_class_list,
+                         )
+    dataset.save()
+
+    # Dataset governance
+    gov_str = f"Merged classes into {target_class_name} by regex match"
 
     if dataset.track_provenance():
         mark_provenance(ProvenanceActivityType.MODIFIED, gov_str, dataset_dir)

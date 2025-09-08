@@ -1,11 +1,9 @@
 ###############################################################################
 # Global Imports
 ###############################################################################
-from collections.abc import Callable
 import json
 import os
 import pathlib
-from typing import Optional
 from uuid import uuid4
 
 ###############################################################################
@@ -16,7 +14,7 @@ import click
 ###############################################################################
 # Local Imports
 ###############################################################################
-from .common import CLASSFILE_NAME, DATA_DIR, PREFERRED_METADATA_FILENAME, REQUIRED_METADATA_FIELD_NAMES, SERAPH_FILENAME, write_csv, write_json
+from .common import CLASSFILE_NAME, DATA_DIR, PREFERRED_METADATA_FILENAME, REQUIRED_METADATA_FIELD_NAMES, SERAPH_FILENAME, write_csv, write_json, get_input
 
 
 ###############################################################################
@@ -29,21 +27,7 @@ class MediaTypeError(Exception):
 ###############################################################################
 # Helpers
 ###############################################################################
-def _get_input(prompt: str,
-               *,
-               valid_fn: Optional[Callable[[str], bool]] = None,
-               err_prompt="Invalid input",
-               ) -> str:
-    while True:
-        user_input = input(prompt)
-        is_valid = True
-        if valid_fn is not None:
-            is_valid = valid_fn(user_input)
 
-        if is_valid:
-            return user_input.strip()
-        else:
-            print(err_prompt)
 
 
 def _get_uuid_uri():
@@ -73,17 +57,17 @@ def _has_media_subtype(arg: str) -> bool:
 @click.option("--override", default=False)
 def init(dataset_path: str, override: bool):
     # Get the metadata fields from the user
-    dataset_id = _get_input("Enter a dataset ID: ")
+    dataset_id = get_input("Enter a dataset ID: ")
     if not dataset_id:
         dataset_id = _get_uuid_uri()
         print(f"Setting random datset URI: {dataset_id}")
 
-    dataset_name = _get_input("Enter a human-readable dataset name: ",
+    dataset_name = get_input("Enter a human-readable dataset name: ",
                               valid_fn=_string_is_not_empty,
                               err_prompt="Dataset name cannot be an empty string",
                               )
 
-    author_id = _get_input("Enter your agent @id: ",
+    author_id = get_input("Enter your agent @id: ",
                            valid_fn=_string_is_not_empty,
                            err_prompt="Agent @id cannot be an empty string",
                            )
@@ -91,25 +75,25 @@ def init(dataset_path: str, override: bool):
     # TODO: Support CRediT (https://credit.niso.org/) and DataCite (https://datacite-metadata-schema.readthedocs.io/en/4.6/properties/contributor/#a-contributortype)
     author_rel = "associatedWith"
 
-    media_type = _get_input("Enter the dataset media type: ")
+    media_type = get_input("Enter the dataset media type: ")
     if media_type and not _has_media_subtype(media_type):
-        media_subtype = _get_input("Enter the dataset media subtype: ")
+        media_subtype = get_input("Enter the dataset media subtype: ")
     else:
         media_subtype = None
 
-    license = _get_input("Enter the dataset license: ")
+    license = get_input("Enter the dataset license: ")
 
     keywords = []
     keywork_input = "placeholder"
     while keywork_input:
-        keywork_input = _get_input("Add keyword(s) to the dataset: ")
+        keywork_input = get_input("Add keyword(s) to the dataset: ")
         if keywork_input:
             keywords.append(keywork_input)
-    
-    prov_tmp = _get_input("Track dataset provenance? [Y/n] ").strip()
+
+    prov_tmp = get_input("Track dataset provenance? [Y/n] ").strip()
     track_provenance = (not prov_tmp) or prov_tmp.lower() == "y"
 
-    ver_tmp = _get_input("Track dataset version? [Y/n] ").strip()
+    ver_tmp = get_input("Track dataset version? [Y/n] ").strip()
     track_version = (not ver_tmp) or ver_tmp.lower() == "y"
 
     # Write the file

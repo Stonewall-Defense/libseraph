@@ -1,11 +1,12 @@
 ###############################################################################
 # Global Imports
 ###############################################################################
+from collections.abc import Callable
 import csv
 from enum import Enum
 import json
 import os
-from typing import TypeVar
+from typing import Optional, TypeVar
 
 
 ###############################################################################
@@ -79,3 +80,20 @@ def str_to_enum(arg: str, target_enum: type[T]) -> T:
         return target_enum(arg)
     except KeyError:
         raise EnumArgumentError(f"Invalid value {arg} for enumerated type {type(target_enum)}; must be one of {[val.name for val in target_enum]}")
+
+
+def get_input(prompt: str,
+              *,
+              valid_fn: Optional[Callable[[str], bool]] = None,
+              err_prompt="Invalid input",
+              ) -> str:
+    while True:
+        user_input = input(prompt)
+        is_valid = True
+        if valid_fn is not None:
+            is_valid = valid_fn(user_input)
+
+        if is_valid:
+            return user_input.strip()
+        else:
+            print(err_prompt)
