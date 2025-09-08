@@ -1,7 +1,15 @@
 ###############################################################################
+# Global Imports
+###############################################################################
+from fractions import Fraction
+from typing import Optional
+
+###############################################################################
 # 3PP Imports
 ###############################################################################
 import click
+from rich import print
+from rich.table import Column, Table
 
 ###############################################################################
 # Local Imports
@@ -9,6 +17,48 @@ import click
 from .dataset import SeraphDataset
 from .provenance import ProvenanceActivityType, mark_provenance
 from .version import mark_version_note, VersionBumpType, ChangeType
+
+
+###############################################################################
+# Helpers
+###############################################################################
+def _ratio_color(siz: int, max_siz: int):
+    ratio = siz / max_siz
+
+    if ratio > 1 / 2:
+        return "green"
+    elif ratio > 1 / 4:
+        return "yellow"
+    else:
+        return "red"
+
+
+def _pprint_ratio(val: float):
+    frac = Fraction(val)
+    denom = int(frac.denominator / frac.numerator)
+    return f"1/{denom}"
+
+
+def _pprint_class_balance(class_list: list[str], mapped_class_totals: dict[str, int]):
+    max_siz = max(mapped_class_totals.values())
+    min_siz = min(mapped_class_totals.values())
+
+    max_bal = min_siz / max_siz
+    max_bal_color = _ratio_color(min_siz, max_siz)
+
+    table = Table(
+        "Class Name",
+        Column("Data Size", justify="right"),
+        Column("Class Ratio", justify="right"),
+        title=f"Class Balances (overall [{max_bal_color}]{_pprint_ratio(max_bal)}[/{max_bal_color}])"
+    )
+
+    for cls in class_list:
+        siz = mapped_class_totals[cls]
+        bal = siz / max_siz
+        bal_color = _ratio_color(siz, max_siz)
+        table.add_row(cls, str(siz), f"[{bal_color}]{_pprint_ratio(bal)}[/{bal_color}]")
+    print(table)
 
 
 ###############################################################################
@@ -182,6 +232,27 @@ def merge_classes(dataset_dir: str,
 
     if dataset.track_version():
         mark_version_note(VersionBumpType.MAJOR, ChangeType.CHANGE, gov_str, dataset_dir)
+
+
+@classes.command("check-balance")
+@click.option("--dataset_dir", default=".")
+@click.option("--len_col_name")
+def classes_check_balance(dataset_dir: str, len_col_name: Optional[str]):
+    # Setup
+    dataset = SeraphDataset(dataset_dir)
+    _, metadata = dataset.get_metadata()
+    class_list = dataset.get_classes()
+
+    mapped_class_totals = {}
+    for cls in class_list:
+        mapped_class_totals[cls] = 0
+
+    for record in metadata:
+        cls = record["class_name"]
+        siz = record[len_col_name] if len_col_name else 1
+        mapped_class_totals[cls] += siz
+
+    _pprint_class_balance(class_list, mapped_class_totals)
 
 
 ###############################################################################

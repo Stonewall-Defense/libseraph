@@ -77,6 +77,13 @@ CLIP_END_STRAEGIES = [val.value for val in ClipEndStrategy]
 
 
 ###############################################################################
+# Errors
+###############################################################################
+class SeraphMetadataError(Exception):
+    pass
+
+
+###############################################################################
 # Classes
 ###############################################################################
 @dataclass
@@ -568,6 +575,28 @@ def _clip_audio_files(dataset: SeraphDataset,
         write_csv("clipped_metadata.csv", headers, clipped_metadata)
 
 
+def _resample_audio_files(dataset: SeraphDataset, target_sr: int):
+    data_dir = dataset.get_data_dir()
+    _, meta_records = dataset.get_metadata()
+    seraph = dataset.get_seraph_metadata()
+    if not seraph.mediaMetadata:
+        raise SeraphMetadataError(f"No media metadata found for dataset {seraph.name}")
+
+    for entry in tqdm(meta_records, "Mixing audio files"):
+        filename = entry["filename"]
+        fq_filename = os.path.join(data_dir, filename)
+
+        # TODO: Support additional channels, maybe
+        _rewrite_audio_file(fq_filename, fq_filename, target_sr=target_sr, target_channels=1)
+
+    # Update metadata
+    seraph.mediaMetadata["audio"]["wav"]["sampleRate"] = target_sr
+    seraph.mediaMetadata["audio"]["wav"]["numChannels"] = 1
+
+    # Save the updates
+    dataset.set_seraph_metadata(seraph).save()
+
+
 ###############################################################################
 # ! Commands
 ###############################################################################
@@ -699,6 +728,24 @@ def audio_clip_files(clip_duration_secs: float,
 
         if dataset.track_version():
             mark_version_note(VersionBumpType.MINOR, ChangeType.CHANGE, gov_str)
+
+
+@audio.command("resample")
+@click.option("--dataset_dir", default=".")
+@click.option("--target_sr", type=int)
+def audio_resample(dataset_dir: str, target_sr: int):
+    dataset = SeraphDataset(dataset_dir)
+
+    _resample_audio_files(dataset, target_sr)
+
+    # Data governance
+    gov_str = f"Resampled audio to {(target_sr/1000):.02f} KHz"
+
+    if dataset.track_provenance():
+        mark_provenance(ProvenanceActivityType.MODIFIED, gov_str, dataset_dir)
+
+    if dataset.track_version():
+        mark_version_note(VersionBumpType.MAJOR, ChangeType.CHANGE, gov_str)
 
 
 ###############################################################################
