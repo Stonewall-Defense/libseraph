@@ -94,7 +94,7 @@ def _preprocess_split_data(metadata: list[dict[str, str]],
                            ):
     ret: dict[int, list[SplitEntry]] = {}
 
-    for entry in metadata:
+    for entry in tqdm(metadata, "Preprocessing metadata for splits"):
         class_id = int(entry["class_id"])
 
         # Default to count each item once for e.g. images
