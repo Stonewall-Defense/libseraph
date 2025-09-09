@@ -1,3 +1,7 @@
+# libseraph
+
+A hot new dataset management tool that's crazy easy
+
 ## Usage
 
 ```bash
@@ -32,3 +36,6 @@ conda deactivate
 
 - Prevent a dataset from being "double-tapped"
 - Mark imports of partial datasets properly
+- Delete matching criteria
+- Undo
+- Submit licenses

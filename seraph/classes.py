@@ -2,6 +2,7 @@
 # Global Imports
 ###############################################################################
 from fractions import Fraction
+from itertools import zip_longest
 import os
 import re
 from typing import Optional
@@ -38,7 +39,7 @@ def _ratio_color(siz: int, max_siz: int):
 
 def _pprint_ratio(val: float):
     frac = Fraction(val)
-    denom = int(frac.denominator / frac.numerator)
+    denom = round(frac.denominator / frac.numerator)
     return f"1/{denom}"
 
 
@@ -60,7 +61,19 @@ def _pprint_class_balance(class_list: list[str], mapped_class_totals: dict[str, 
         siz = mapped_class_totals[cls]
         bal = siz / max_siz
         bal_color = _ratio_color(siz, max_siz)
-        table.add_row(cls, str(siz), f"[{bal_color}]{_pprint_ratio(bal)}[/{bal_color}]")
+        table.add_row(cls, str(int(siz)), f"[{bal_color}]{_pprint_ratio(bal)}[/{bal_color}]")
+    print(table)
+
+
+def _print_class_match_list(matches: list[str], survivors: list[str], target: str, pattern: str):
+    table = Table(
+        Column("Survivors", justify="left"),
+        Column("Matches", justify="left"),
+        title=f"Effects of Merging Classes Into `{target}` via match {pattern}"
+    )
+
+    for s, m in zip_longest(survivors, matches):
+        table.add_row(f"[green]{s}[/green]" if s else "", f"[red]{m}[/red]")
     print(table)
 
 
@@ -241,9 +254,11 @@ def merge_classes(dataset_dir: str,
 @click.option("--dataset_dir", default=".")
 @click.option("--target_class_name", required=True)
 @click.option("--sort_classes", default=True)
+@click.option("--dry_run", is_flag=True)
 def merge_classes_regex(dataset_dir: str,
                         target_class_name: str,
                         sort_classes: bool,
+                        dry_run: bool,
                         ):
     # Setup
     dataset = SeraphDataset(dataset_dir)
@@ -259,6 +274,12 @@ def merge_classes_regex(dataset_dir: str,
         raise ValueError("Must specify a regex to capture classes")
 
     pattern = re.compile(class_merge_regex)
+
+    if dry_run:
+        matches = sorted([c for c in class_list if re.match(pattern, c)])
+        survivors = sorted([c for c in class_list if not re.match(pattern, c)])
+        _print_class_match_list(matches, survivors, target_class_name, class_merge_regex)
+        return
 
     # Generate new metadata
     new_class_list = [c for c in class_list if not re.match(pattern, c)]
@@ -311,21 +332,22 @@ def classes_check_balance(dataset_dir: str, len_col_name: Optional[str]):
     for record in metadata:
         cls = record["class_name"]
         siz = record[len_col_name] if len_col_name else 1
-        mapped_class_totals[cls] += siz
+        siz = siz or 1
+        mapped_class_totals[cls] += float(siz)
 
     _pprint_class_balance(class_list, mapped_class_totals)
 
 
-@classes.command("add-to-dataset")
-@click.option("--dataset_dir", default=".")
+@classes.command("compose")
+@click.option("--target_dir", default=".")
 @click.option("--compose_col", multiple=True)
 @click.option("--separator_char", default=" ")
-def classes_add_to_dataset(dataset_dir: str, compose_col: tuple[str], separator_char: str):
-    fq_class_file = os.path.join(dataset_dir, CLASSFILE_NAME)
+def classes_compose(target_dir: str, compose_col: tuple[str], separator_char: str):
+    fq_class_file = os.path.join(target_dir, CLASSFILE_NAME)
     classes_tmp = set()
 
-    metadata_filename = get_metadata_filename(dataset_dir)
-    fq_metadata_file = os.path.join(dataset_dir, metadata_filename)
+    metadata_filename = get_metadata_filename(target_dir)
+    fq_metadata_file = os.path.join(target_dir, metadata_filename)
     headers, metadata = read_csv(fq_metadata_file)
 
     if not all([c in headers for c in compose_col]):

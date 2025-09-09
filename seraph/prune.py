@@ -64,8 +64,7 @@ def prune_records(dataset_dir: str, dry_run: bool):
                 idx_to_remove.append(idx)
 
     if len(idx_to_remove):
-        for idx in idx_to_remove:
-            del metadata_records[idx]
+        metadata_records = [r for idx, r in enumerate(metadata_records) if idx not in idx_to_remove]
         dataset.set_metadata_records(metadata_records)
         dataset.save()
 

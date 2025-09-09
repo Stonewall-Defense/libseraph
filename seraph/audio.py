@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from enum import Enum
 import os
 import shutil
+import sys
 from typing import Any, Optional
 import warnings
 
@@ -24,7 +25,7 @@ import torchaudio
 ###############################################################################
 # Local Imports
 ###############################################################################
-from .common import REQUIRED_METADATA_FIELD_NAMES, str_to_enum, write_csv
+from .common import REQUIRED_METADATA_FIELD_NAMES, REQUIRED_METADATA_IMPORT_COLS, str_to_enum, write_csv
 from .dataset import SeraphDataset
 from .provenance import ProvenanceActivityType, mark_provenance
 from .version import mark_version_note, VersionBumpType, ChangeType
@@ -153,7 +154,7 @@ def _merge_classes(local_dataset: SeraphDataset, remote_dataset: SeraphDataset) 
 
 def _filter_metadata_keys(keys: Iterable[str]) -> list[str]:
     # TODO: Make this better somehow
-    KEYS_TO_IGNORE = REQUIRED_METADATA_FIELD_NAMES + METADATA_FIELDS_TO_STRIP
+    KEYS_TO_IGNORE = REQUIRED_METADATA_FIELD_NAMES + REQUIRED_METADATA_IMPORT_COLS + METADATA_FIELDS_TO_STRIP
     return [k for k in keys if k not in KEYS_TO_IGNORE]
 
 
@@ -209,16 +210,23 @@ def _merge_metadata(local_dataset: SeraphDataset,
     _, local_meta_records = local_dataset.get_metadata()
     _, remote_meta_records = remote_dataset.get_metadata()
 
-    # If no local metadata, the result will be the same as the remote data so skip this step
-    if local_meta_records:
-        for entry in remote_meta_records:
+    remote_seraph = remote_dataset.get_seraph_metadata()
+    original_dataset_uri = remote_seraph.uri
+    license = remote_seraph.license
+
+    for entry in remote_meta_records:
+        entry["original_dataset_uri"] = original_dataset_uri
+        entry.setdefault("license", license or "UNKNOWN")
+
+        # If no local metadata, the result will be the same as the remote data so skip this step
+        if local_meta_records:
             original_class_id = int(entry["class_id"])
             new_class_id = remote_class_mapping.get(original_class_id, class_list.index(entry["class_name"]))
 
             entry["class_id"] = str(new_class_id)
             entry["class_name"] = class_list[new_class_id]
 
-    fieldnames = deepcopy(REQUIRED_METADATA_FIELD_NAMES)
+    fieldnames = REQUIRED_METADATA_FIELD_NAMES + REQUIRED_METADATA_IMPORT_COLS
     if metadata_field_merge_strat == MetadataFieldMergeStrategy.APPEND:
         fieldnames += _add_all_metadata_fields(local_meta_records, remote_meta_records)
     elif metadata_field_merge_strat == MetadataFieldMergeStrategy.TRUNCATE:
@@ -252,7 +260,8 @@ def _rewrite_audio_file(fq_input_name: str,
         use_shell_copy = (sr_matches and channels_match)
 
     if use_shell_copy:
-        shutil.copy(fq_input_name, fq_output_name)
+        if fq_input_name != fq_output_name:
+            shutil.copy(fq_input_name, fq_output_name)
         return
 
     wave, sr = torchaudio.load(fq_input_name, normalize=True)
@@ -538,10 +547,12 @@ def _clip_audio_files(dataset: SeraphDataset,
             clip_id += 1
             duration -= clip_duration_secs
 
-        if end_strat == ClipEndStrategy.EXTEND:
+        have_clips = len(clip_record.clips) > 0
+
+        if end_strat == ClipEndStrategy.EXTEND and have_clips:
             clipped_metadata[-1]["duration_secs"] = clip_duration_secs + duration
             clip_record.clips[-1].end_secs += duration
-        elif end_strat == ClipEndStrategy.PARTIAL:  # Possible TODO: Clean up this path
+        elif end_strat == ClipEndStrategy.PARTIAL or not have_clips:  # Possible TODO: Clean up this path
             clip_filename = f"{filename_root}-{clip_id}.{ext}"
 
             # Update metadata records
@@ -746,6 +757,57 @@ def audio_resample(dataset_dir: str, target_sr: int):
 
     if dataset.track_version():
         mark_version_note(VersionBumpType.MAJOR, ChangeType.CHANGE, gov_str)
+
+
+# TODO: Support more than just lossless audio and use the expected metadata to drive the logic
+@audio.command("verify")
+@click.option("--dataset_dir", default=".")
+@click.option("--stop_on_error", is_flag=True)
+def audio_verify(dataset_dir: str, stop_on_error: bool):
+    dataset = SeraphDataset(dataset_dir)
+
+    seraph = dataset.get_seraph_metadata()
+    if seraph.mediaMetadata is None or seraph.mediaMetadata["audio"] is None:
+        print("Audio verification requires the 'audio' field of the 'mediaMetadata' to be present")
+        sys.exit(1)
+    audio_meta = seraph.mediaMetadata["audio"]
+
+    data_dir = dataset.get_data_dir()
+    files = os.listdir(data_dir)
+
+    for f in files:
+        ext = f.split(".")[-1]
+        expected_meta = audio_meta.get(ext, None)
+        if expected_meta is None:
+            print(f"File {f} has unsupported media type: {ext}")
+            if stop_on_error:
+                sys.exit(1)
+            else:
+                continue
+
+        fq_filename = os.path.join(data_dir, f)
+        file_meta = TinyTag.get(fq_filename)
+
+        if expected_meta["sampleRate"] != file_meta.samplerate:
+            print(f"File {f} has incorrect sample rate: {file_meta.samplerate}")
+            if stop_on_error:
+                sys.exit(1)
+            else:
+                continue
+
+        if expected_meta["numChannels"] != file_meta.channels:
+            print(f"File {f} has incorrect number of channels: {file_meta.channels}")
+            if stop_on_error:
+                sys.exit(1)
+            else:
+                continue
+
+        if expected_meta["bitsPerSample"] != file_meta.bitdepth:
+            print(f"File {f} has incorrect bit depth: {file_meta.bitdepth}")
+            if stop_on_error:
+                sys.exit(1)
+            else:
+                continue
 
 
 ###############################################################################

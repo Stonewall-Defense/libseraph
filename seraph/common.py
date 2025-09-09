@@ -40,6 +40,8 @@ DATA_DIR = "data"
 
 REQUIRED_METADATA_FIELD_NAMES = ["class_id", "class_name", "filename"]
 
+REQUIRED_METADATA_IMPORT_COLS = ["original_dataset_uri", "license"]
+
 
 ###############################################################################
 # Helpers
