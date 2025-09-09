@@ -3,7 +3,7 @@
 ###############################################################################
 from collections.abc import Iterable
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from enum import Enum
 import os
 import shutil
@@ -16,6 +16,8 @@ import warnings
 # 3PP Imports
 ###############################################################################
 import click
+from rich import print
+from rich.table import Table
 from tqdm import tqdm
 from tinytag import TinyTag
 import torch
@@ -68,6 +70,11 @@ class ClipEndStrategy(Enum):
     DISCARD = "discard"
 
 
+class VerifyOutputFormat(Enum):
+    PRINT = "print"
+    CSV = "csv"
+
+
 AUDIO_BASE_MERGE_STRATEGIES = [val.value for val in AudioBaseMergeStrategy]
 AUDIO_MIX_MERGE_STRATEGIES = [val.value for val in AudioMixMergeStrategy]
 
@@ -75,6 +82,8 @@ METADATA_FIELD_MERGE_STRATEGIES = [val.value for val in MetadataFieldMergeStrate
 METADATA_COLUMN_CONFLICT_STRATEGIES = [val.value for val in MetadataColumnConflictStrategy]
 
 CLIP_END_STRAEGIES = [val.value for val in ClipEndStrategy]
+
+VERIFY_OUTPUT_FORMATS = [val.value for val in VerifyOutputFormat]
 
 
 ###############################################################################
@@ -98,6 +107,15 @@ class Clip:
 class FileToClip:
     filename: str
     clips: list[Clip]
+
+
+@dataclass
+class VerifyError:
+    filename: str
+    subtype: Optional[str]
+    sample_rate: Optional[int]
+    channels: Optional[int]
+    bit_depth: Optional[int]
 
 
 ###############################################################################
@@ -762,8 +780,8 @@ def audio_resample(dataset_dir: str, target_sr: int):
 # TODO: Support more than just lossless audio and use the expected metadata to drive the logic
 @audio.command("verify")
 @click.option("--dataset_dir", default=".")
-@click.option("--stop_on_error", is_flag=True)
-def audio_verify(dataset_dir: str, stop_on_error: bool):
+@click.option("--output_format", default="print", type=click.Choice(VERIFY_OUTPUT_FORMATS))
+def audio_verify(dataset_dir: str, output_format: str):
     dataset = SeraphDataset(dataset_dir)
 
     seraph = dataset.get_seraph_metadata()
@@ -772,42 +790,55 @@ def audio_verify(dataset_dir: str, stop_on_error: bool):
         sys.exit(1)
     audio_meta = seraph.mediaMetadata["audio"]
 
+    fmt = str_to_enum(output_format, VerifyOutputFormat)
+
     data_dir = dataset.get_data_dir()
     files = os.listdir(data_dir)
 
-    for f in files:
+    violations: list[VerifyError] = []
+
+    for f in tqdm(files, "Scanning for dataset contract violations"):
+        violation = VerifyError(filename=f, subtype=None, sample_rate=None, channels=None, bit_depth=None)
+
         ext = f.split(".")[-1]
         expected_meta = audio_meta.get(ext, None)
         if expected_meta is None:
-            print(f"File {f} has unsupported media type: {ext}")
-            if stop_on_error:
-                sys.exit(1)
-            else:
-                continue
+            violation.subtype = ext
+            continue
 
         fq_filename = os.path.join(data_dir, f)
         file_meta = TinyTag.get(fq_filename)
 
         if expected_meta["sampleRate"] != file_meta.samplerate:
-            print(f"File {f} has incorrect sample rate: {file_meta.samplerate}")
-            if stop_on_error:
-                sys.exit(1)
-            else:
-                continue
+            violation.sample_rate = file_meta.samplerate
 
         if expected_meta["numChannels"] != file_meta.channels:
-            print(f"File {f} has incorrect number of channels: {file_meta.channels}")
-            if stop_on_error:
-                sys.exit(1)
-            else:
-                continue
+            violation.channels = file_meta.channels
 
         if expected_meta["bitsPerSample"] != file_meta.bitdepth:
-            print(f"File {f} has incorrect bit depth: {file_meta.bitdepth}")
-            if stop_on_error:
-                sys.exit(1)
-            else:
-                continue
+            violation.bit_depth = file_meta.bitdepth
+
+        have_violation = violation.subtype or violation.sample_rate or violation.channels or violation.bit_depth
+        if have_violation:
+            violations.append(violation)
+
+    if not violations:
+        print("[bold green]No dataset contract violations![bold green]")
+    else:
+        COLUMNS = ["filename", "subtype", "sample_rate", "channels", "bit_depth"]
+        if fmt == VerifyOutputFormat.CSV:
+            write_csv("verification-errors.csv",
+                      COLUMNS,
+                      [asdict(v) for v in violations])
+        else:
+            table = Table(
+                *COLUMNS,
+                title="Dataset Contract Violations"
+            )
+
+            for v in violations:
+                table.add_row(v.filename, v.subtype, str(v.sample_rate), str(v.channels), str(v.bit_depth))
+            print(table)
 
 
 ###############################################################################

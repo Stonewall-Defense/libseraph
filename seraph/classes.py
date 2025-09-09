@@ -39,7 +39,7 @@ def _ratio_color(siz: int, max_siz: int):
 
 def _pprint_ratio(val: float):
     frac = Fraction(val)
-    denom = round(frac.denominator / frac.numerator)
+    denom = round(frac.denominator / (frac.numerator or 1))
     return f"1/{denom}"
 
 
