@@ -6,13 +6,13 @@ import click
 ###############################################################################
 # Local Imports
 ###############################################################################
-from .audio import audio
-from .classes import classes
-from .init import init
-from .provenance import prov
-from .prune import prune
-from .splits import splits
-from .version import version
+from .exec.audio import audio
+from .exec.classes import classes
+from .exec.init import init
+from .exec.provenance import prov
+from .exec.prune import prune
+from .exec.splits import splits
+from .exec.version import version
 
 
 ###############################################################################

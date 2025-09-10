@@ -27,10 +27,7 @@ import torchaudio
 ###############################################################################
 # Local Imports
 ###############################################################################
-from .common import REQUIRED_METADATA_FIELD_NAMES, REQUIRED_METADATA_IMPORT_COLS, str_to_enum, write_csv
-from .dataset import SeraphDataset
-from .provenance import ProvenanceActivityType, mark_provenance
-from .version import mark_version_note, VersionBumpType, ChangeType
+from ..lib import REQUIRED_METADATA_FIELD_NAMES, REQUIRED_METADATA_IMPORT_COLS, str_to_enum, write_csv, SeraphDataset, VersionBumpType, ChangeType, ChangeRecord, ImportRecord, SeraphMetadataError
 
 
 ###############################################################################
@@ -84,13 +81,6 @@ METADATA_COLUMN_CONFLICT_STRATEGIES = [val.value for val in MetadataColumnConfli
 CLIP_END_STRAEGIES = [val.value for val in ClipEndStrategy]
 
 VERIFY_OUTPUT_FORMATS = [val.value for val in VerifyOutputFormat]
-
-
-###############################################################################
-# Errors
-###############################################################################
-class SeraphMetadataError(Exception):
-    pass
 
 
 ###############################################################################
@@ -149,6 +139,7 @@ def _prune_remote_data_by_classes(remote_dataset: SeraphDataset,
     new_metadata = [m for m in metadata_records if select_fn(m["class_name"])]
 
     remote_dataset.set_classes(new_classes).set_metadata_records(new_metadata)
+    return new_classes
 
 
 def _merge_classes(local_dataset: SeraphDataset, remote_dataset: SeraphDataset) -> tuple[list[str], dict[int, int]]:
@@ -454,7 +445,7 @@ def _import_audio_dataset(local_dataset: SeraphDataset,
     ####################
     # Actually import the data
     ####################
-    _prune_remote_data_by_classes(remote_dataset, class_select, class_exclude)
+    imported_classes = _prune_remote_data_by_classes(remote_dataset, class_select, class_exclude)
 
     new_class_list, remote_class_mapping = _merge_classes(local_dataset, remote_dataset)
     fieldnames, local_meta_records, remote_meta_records = _merge_metadata(local_dataset, remote_dataset, metadata_field_merge_strat, new_class_list, remote_class_mapping)
@@ -467,10 +458,29 @@ def _import_audio_dataset(local_dataset: SeraphDataset,
                               sr_to_mix_to=sr_to_mix_to,
                               mix_local_sr=mix_local_sr,
                               )
+
+    ####################
+    # Save the dataset
+    ####################
+    remote_meta = remote_dataset.get_seraph_metadata()
+
+    change = ChangeRecord(
+        bump_type=VersionBumpType.MAJOR,
+        change_type=ChangeType.ADD,
+        message=f"Added data from {remote_meta.uri} to dataset"
+    )
+    import_rec = ImportRecord(
+        uri=remote_meta.uri,
+        version=remote_meta.version,
+        classes=imported_classes
+    )
+
     local_dataset.set_multiple(classes=new_class_list,
                                metadata_headers=fieldnames,
                                metadata_records=local_meta_records + remote_meta_records,
-                               seraph_metadata=local_seraph)
+                               seraph_metadata=local_seraph,
+                               change_records=[change],
+                               import_records=[import_rec])
     local_dataset.save()
 
 
@@ -599,31 +609,14 @@ def _clip_audio_files(dataset: SeraphDataset,
             _write_audio_clips(record, data_dir)
 
         # Save the dataset
-        dataset.set_metadata_headers(headers).set_metadata_records(clipped_metadata).save()
+        change = ChangeRecord(
+            bump_type=VersionBumpType.MINOR,
+            change_type=ChangeType.CHANGE,
+            message=f"Clipped audio to {clip_duration_secs:.02f} secs"
+        )
+        dataset.set_metadata_headers(headers, change_record=change).set_metadata_records(clipped_metadata).save()
     else:
         write_csv("clipped_metadata.csv", headers, clipped_metadata)
-
-
-def _resample_audio_files(dataset: SeraphDataset, target_sr: int):
-    data_dir = dataset.get_data_dir()
-    _, meta_records = dataset.get_metadata()
-    seraph = dataset.get_seraph_metadata()
-    if not seraph.mediaMetadata:
-        raise SeraphMetadataError(f"No media metadata found for dataset {seraph.name}")
-
-    for entry in tqdm(meta_records, "Mixing audio files"):
-        filename = entry["filename"]
-        fq_filename = os.path.join(data_dir, filename)
-
-        # TODO: Support additional channels, maybe
-        _rewrite_audio_file(fq_filename, fq_filename, target_sr=target_sr, target_channels=1)
-
-    # Update metadata
-    seraph.mediaMetadata["audio"]["wav"]["sampleRate"] = target_sr
-    seraph.mediaMetadata["audio"]["wav"]["numChannels"] = 1
-
-    # Save the updates
-    dataset.set_seraph_metadata(seraph).save()
 
 
 ###############################################################################
@@ -675,15 +668,6 @@ def audio_import(import_dir: str,
                           list(class_exclude) if class_exclude else None,
                           )
 
-    # Provenance
-    remote_uri = remote_dataset.get_seraph_metadata().uri
-
-    if local_dataset.track_provenance():
-        mark_provenance(ProvenanceActivityType.USED, remote_uri, local_dataset.get_dataset_root_dir())
-
-    if local_dataset.track_version():
-        mark_version_note(VersionBumpType.MAJOR, ChangeType.ADD, f"Added data from {remote_uri} to dataset")
-
 
 @audio.command("duration")
 @click.option("--dataset_dir", default=".")
@@ -718,14 +702,12 @@ def audio_add_duration(dataset_dir: str,
 
         entry[DURATION_COL_DEFAULT_NAME] = f"{duration_secs:.03f}"
 
-    dataset.set_metadata_headers(fieldnames).set_metadata_records(metadata).save()
-
-    # Provenance
-    if dataset.track_provenance():
-        mark_provenance(ProvenanceActivityType.MODIFIED, "Added or updated audio duration column", dataset_dir)
-
-    if dataset.track_version():
-        mark_version_note(VersionBumpType.MINOR, ChangeType.ADD, "Added audio duration column", dataset_dir)
+    change = ChangeRecord(
+        bump_type=VersionBumpType.MINOR,
+        change_type=ChangeType.ADD,
+        message="Added or updated audio duration column"
+    )
+    dataset.set_metadata_headers(fieldnames, change_record=change).set_metadata_records(metadata).save()
 
 
 @audio.command("clip")
@@ -748,16 +730,6 @@ def audio_clip_files(clip_duration_secs: float,
 
     _clip_audio_files(dataset, clip_duration_secs, duration_col_name, end_strat, force, dry_run)
 
-    # Data governance
-    if not dry_run:
-        gov_str = f"Clipped audio to {clip_duration_secs:.02f} secs"
-
-        if dataset.track_provenance():
-            mark_provenance(ProvenanceActivityType.MODIFIED, gov_str, dataset_dir)
-
-        if dataset.track_version():
-            mark_version_note(VersionBumpType.MINOR, ChangeType.CHANGE, gov_str)
-
 
 @audio.command("resample")
 @click.option("--dataset_dir", default=".")
@@ -765,16 +737,30 @@ def audio_clip_files(clip_duration_secs: float,
 def audio_resample(dataset_dir: str, target_sr: int):
     dataset = SeraphDataset(dataset_dir)
 
-    _resample_audio_files(dataset, target_sr)
+    data_dir = dataset.get_data_dir()
+    _, meta_records = dataset.get_metadata()
+    seraph = dataset.get_seraph_metadata()
+    if not seraph.mediaMetadata:
+        raise SeraphMetadataError(f"No media metadata found for dataset {seraph.name}")
 
-    # Data governance
-    gov_str = f"Resampled audio to {(target_sr/1000):.02f} KHz"
+    for entry in tqdm(meta_records, "Mixing audio files"):
+        filename = entry["filename"]
+        fq_filename = os.path.join(data_dir, filename)
 
-    if dataset.track_provenance():
-        mark_provenance(ProvenanceActivityType.MODIFIED, gov_str, dataset_dir)
+        # TODO: Support additional channels, maybe
+        _rewrite_audio_file(fq_filename, fq_filename, target_sr=target_sr, target_channels=1)
 
-    if dataset.track_version():
-        mark_version_note(VersionBumpType.MAJOR, ChangeType.CHANGE, gov_str)
+    # Update metadata
+    seraph.mediaMetadata["audio"]["wav"]["sampleRate"] = target_sr
+    seraph.mediaMetadata["audio"]["wav"]["numChannels"] = 1
+
+    # Save the updates
+    change = ChangeRecord(
+        bump_type=VersionBumpType.MAJOR,
+        change_type=ChangeType.CHANGE,
+        message=f"Resampled audio to {(target_sr/1000):.02f} KHz"
+    )
+    dataset.set_seraph_metadata(seraph, change_record=change).save()
 
 
 # TODO: Support more than just lossless audio and use the expected metadata to drive the logic

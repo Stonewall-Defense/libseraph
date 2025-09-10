@@ -17,10 +17,7 @@ from rich.table import Column, Table
 ###############################################################################
 # Local Imports
 ###############################################################################
-from .common import CLASSFILE_NAME, get_input, get_metadata_filename, read_csv, write_csv, write_json
-from .dataset import SeraphDataset
-from .provenance import ProvenanceActivityType, mark_provenance
-from .version import mark_version_note, VersionBumpType, ChangeType
+from ..lib import read_csv, write_csv, write_json, get_input, get_metadata_filename, SeraphDataset, VersionBumpType, ChangeType, ChangeRecord, CLASSFILE_NAME
 
 
 ###############################################################################
@@ -122,23 +119,25 @@ def switch_classes(dataset_dir: str,
         if not keep_class_col_as_field:
             del entry[new_class_col]
 
+    # Save everything
+    changes = [
+        ChangeRecord(
+            bump_type=VersionBumpType.MAJOR,
+            change_type=ChangeType.ADD,
+            message=f"Changed class column to {new_class_col}"
+        ),
+        ChangeRecord(
+            bump_type=VersionBumpType.MAJOR,
+            change_type=ChangeType.CHANGE,
+            message=f"Renamed previous class column to {new_name_for_current_class_col}"
+        ),
+    ]
     dataset.set_multiple(metadata_headers=fields,
                          metadata_records=metadata,
                          classes=new_classes,
+                         change_records=changes,
                          )
     dataset.save()
-
-    # Dataset governance
-    gov_str = f"Changed class column to {new_class_col}"
-
-    if dataset.track_provenance():
-        mark_provenance(ProvenanceActivityType.MODIFIED, gov_str, dataset_dir)
-
-        prov_str2 = f"Renamed previous class column to {new_name_for_current_class_col}"
-        mark_provenance(ProvenanceActivityType.MODIFIED, prov_str2, dataset_dir)
-
-    if dataset.track_version():
-        mark_version_note(VersionBumpType.MAJOR, ChangeType.CHANGE, gov_str, dataset_dir)
 
 
 @classes.command("rename")
@@ -175,20 +174,18 @@ def rename_classes(dataset_dir: str,
         entry["class_id"] = str(entry_class_id)
         entry["class_name"] = entry_class_name
 
+    # Save everything
+    change = ChangeRecord(
+        bump_type=VersionBumpType.MAJOR,
+        change_type=ChangeType.CHANGE,
+        message=f"Renamed class {old_class_name} to {new_class_name}"
+    )
     dataset.set_multiple(metadata_headers=fields,
                          metadata_records=metadata,
                          classes=class_list,
+                         change_records=[change],
                          )
     dataset.save()
-
-    # Dataset governance
-    gov_str = f"Renamed class {old_class_name} to {new_class_name}"
-
-    if dataset.track_provenance():
-        mark_provenance(ProvenanceActivityType.MODIFIED, gov_str, dataset_dir)
-
-    if dataset.track_version():
-        mark_version_note(VersionBumpType.MAJOR, ChangeType.CHANGE, gov_str, dataset_dir)
 
 
 @classes.command("merge")
@@ -230,24 +227,23 @@ def merge_classes(dataset_dir: str,
         entry["class_name"] = entry_class_name
 
     # Save everything
-    dataset.set_multiple(metadata_headers=fields,
-                         metadata_records=metadata,
-                         classes=new_class_list,
-                         )
-    dataset.save()
-
-    # Dataset governance
     if len(classes_to_merge) > 1:
         prefix = "es " + ", ".join(classes_to_merge)
     else:
         prefix = f" {classes_to_merge[0]}"
     gov_str = f"Merged class{prefix} into {target_class_name}"
 
-    if dataset.track_provenance():
-        mark_provenance(ProvenanceActivityType.MODIFIED, gov_str, dataset_dir)
-
-    if dataset.track_version():
-        mark_version_note(VersionBumpType.MAJOR, ChangeType.CHANGE, gov_str, dataset_dir)
+    change = ChangeRecord(
+        bump_type=VersionBumpType.MAJOR,
+        change_type=ChangeType.CHANGE,
+        message=gov_str
+    )
+    dataset.set_multiple(metadata_headers=fields,
+                         metadata_records=metadata,
+                         classes=new_class_list,
+                         change_records=[change],
+                         )
+    dataset.save()
 
 
 @classes.command("regex-merge")
@@ -300,20 +296,17 @@ def merge_classes_regex(dataset_dir: str,
         entry["class_name"] = entry_class_name
 
     # Save everything
+    change = ChangeRecord(
+        bump_type=VersionBumpType.MAJOR,
+        change_type=ChangeType.CHANGE,
+        message=f"Merged classes into {target_class_name} by regex match",
+    )
     dataset.set_multiple(metadata_headers=fields,
                          metadata_records=metadata,
                          classes=new_class_list,
+                         change_records=[change]
                          )
     dataset.save()
-
-    # Dataset governance
-    gov_str = f"Merged classes into {target_class_name} by regex match"
-
-    if dataset.track_provenance():
-        mark_provenance(ProvenanceActivityType.MODIFIED, gov_str, dataset_dir)
-
-    if dataset.track_version():
-        mark_version_note(VersionBumpType.MAJOR, ChangeType.CHANGE, gov_str, dataset_dir)
 
 
 @classes.command("check-balance")

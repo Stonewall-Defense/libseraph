@@ -3,7 +3,7 @@ name = "seraph"
 version = "v0.1.0"
 
 [project.scripts]
-seraph = "seraph.exec:cli"
+seraph = "seraph.main:cli"
 
 [build-system]
 requires = ["setuptools"]

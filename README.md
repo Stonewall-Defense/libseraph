@@ -2,40 +2,69 @@
 
 A hot new dataset management tool that's crazy easy
 
-## Usage
+## Installation
 
 ```bash
 conda create --name seraph python=3.12
 conda activate seraph
+
 pip install -r requirements.txt
+pip install .
 
-python3 exec.py init
+conda deactivate
+```
 
-python3 exec.py audio import --import_dir ~/Desktop/TEAM-ML/DART/seraph/free-firearm-sounds/
-python3 exec.py audio import --import_dir ~/Desktop/TEAM-ML/DART/seraph/Cadre_Reloaded/
-python3 exec.py audio import --import_dir ~/Desktop/TEAM-ML/DART/seraph/GS_GF/
-python3 exec.py audio import --import_dir ~/Desktop/TEAM-ML/DART/seraph/Kaggle_GS/ --channel_merge_strat mix_down --sample_rate_merge_strat mix_down
+## Usage
 
-python3 exec.py classes switch --new_class_col caliber --new_name_for_current_class_col gun_type
-python3 exec.py classes merge --target_class_name 9x19 --classes_to_merge "9mm Luger" --classes_to_merge "9mm"
-python3 exec.py classes merge --target_class_name ".22LR" --classes_to_merge "0.22"
-python3 exec.py classes merge --target_class_name "7.62x39" --classes_to_merge "7.62x39mm"
+```bash
+# Activate environment
+conda activate seraph
 
-python3 exec.py audio duration --metadata_column_conflict_strat replace
-python3 exec.py audio clip --clip_duration_secs 1 --dry_run
+# Initialize new dataset
+seraph init
 
-python3 exec.py prov show
-python3 exec.py prov submit --activity_label "Make new gunshot dataset"
+# Import audio datasets
+seraph audio import --import_dir ~/Desktop/TEAM-ML/datasets/component/dart/free-firearm-sounds/
+seraph audio import --import_dir ~/Desktop/TEAM-ML/datasets/component/dart/Cadre_Reloaded/
+seraph audio import --import_dir ~/Desktop/TEAM-ML/datasets/component/dart/GS_GF/
+seraph audio import --import_dir ~/Desktop/TEAM-ML/datasets/component/dart/Kaggle_GS/ --channel_merge_strat mix_down --sample_rate_merge_strat mix_down
 
-python3 exec.py version show
+# Switch classes from `gun_type` to `caliber`
+seraph classes switch --new_class_col caliber --new_name_for_current_class_col gun_type
 
+# Merge degenerate classes
+seraph classes merge --target_class_name 9x19 --classes_to_merge "9mm Luger" --classes_to_merge "9mm"
+seraph classes merge --target_class_name ".22LR" --classes_to_merge "0.22"
+seraph classes merge --target_class_name "7.62x39" --classes_to_merge "7.62x39mm"
+
+# Add durations to columns and clip to 1 sec
+seraph audio duration --metadata_column_conflict_strat replace
+seraph audio clip --clip_duration_secs 1 --dry_run
+
+# Show provenance data (WIP)
+seraph prov show
+seraph prov submit --activity_label "Make new gunshot dataset"
+
+# Show verioning data (WIP)
+seraph version show
+
+# Cleanup
 conda deactivate
 ```
 
 ## TODO
 
-- Prevent a dataset from being "double-tapped"
-- Mark imports of partial datasets properly
-- Delete matching criteria
-- Undo
-- Submit licenses
+- **IDEMPOTENCE**
+  - Prevent a dataset from being "double-tapped"
+- Features
+  - Class balance by fold/split
+  - Delete matching criteria
+    - Drop col
+    - Delete class
+    - Delete rows where column matches (or is empty)
+  - Submit licenses
+  - Versions/prov
+    - All versions in order
+    - Submit prov for specific versions
+- Pipe dreams
+  - Undo

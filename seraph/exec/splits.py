@@ -15,10 +15,7 @@ from tqdm import tqdm
 ###############################################################################
 # Local Imports
 ###############################################################################
-from .common import str_to_enum
-from .dataset import SeraphDataset
-from .provenance import ProvenanceActivityType, mark_provenance
-from .version import mark_version_note, VersionBumpType, ChangeType
+from ..lib import str_to_enum, SeraphDataset, VersionBumpType, ChangeType, ChangeRecord
 
 
 ###############################################################################
@@ -235,17 +232,12 @@ def train_test_splits(split_type: str,
                     folded_metadata += clip
 
     # Save everything
-    dataset.set_metadata_headers(fieldnames).set_metadata_records(metadata).save()
-
-    if dataset.track_provenance():
-        prov_str = f"Added test/train{'/validation' if have_validation_split else ''} splits in proportion {split_choice.value.replace('_', '/')}"
-        mark_provenance(ProvenanceActivityType.MODIFIED, prov_str, dataset_dir)
-
-    if dataset.track_version():
-        bump_type = VersionBumpType.MINOR if splits_are_new else VersionBumpType.MAJOR
-        change_type = ChangeType.ADD if splits_are_new else ChangeType.CHANGE
-        message = f"Split test/train{'/validation' if have_validation_split else ''} in proportion {split_choice.value.replace('_', '/')}"
-        mark_version_note(bump_type, change_type, message, dataset_dir)
+    change = ChangeRecord(
+        bump_type=VersionBumpType.MINOR if splits_are_new else VersionBumpType.MAJOR,
+        change_type=ChangeType.ADD if splits_are_new else ChangeType.CHANGE,
+        message=f"Split test/train{'/validation' if have_validation_split else ''} in proportion {split_choice.value.replace('_', '/')}"
+    )
+    dataset.set_metadata_headers(fieldnames, change_record=change).set_metadata_records(metadata).save()
 
 
 @splits.command("fold")
@@ -290,17 +282,13 @@ def fold_splits(n_folds: int,
             for split_entry in fold:
                 folded_metadata += split_entry.clips
 
-    dataset.set_metadata_headers(fieldnames).set_metadata_records(metadata).save()
-
-    if dataset.track_provenance():
-        prov_str = f"{'Added' if folds_are_new else 'Updated'} {n_folds}-validation with per-class DRR assignment"
-        mark_provenance(ProvenanceActivityType.MODIFIED, prov_str, dataset_dir)
-
-    if dataset.track_version():
-        bump_type = VersionBumpType.MINOR if folds_are_new else VersionBumpType.MAJOR
-        change_type = ChangeType.ADD if folds_are_new else ChangeType.CHANGE
-        message = f"{n_folds}-validation with per-class DRR assignment"
-        mark_version_note(bump_type, change_type, message, dataset_dir)
+    # Save everything
+    change = ChangeRecord(
+        bump_type=VersionBumpType.MINOR if folds_are_new else VersionBumpType.MAJOR,
+        change_type=ChangeType.ADD if folds_are_new else ChangeType.CHANGE,
+        message=f"{'Added' if folds_are_new else 'Updated'} {n_folds}-validation with per-class DRR assignment"
+    )
+    dataset.set_metadata_headers(fieldnames, change_record=change).set_metadata_records(metadata).save()
 
 
 ###############################################################################

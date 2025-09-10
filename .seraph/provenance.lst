@@ -1,7 +1,0 @@
-USED: https://doi.org/10.5281/zenodo.7004819
-USED: https://doi.org/10.5281/zenodo.7004819
-USED: https://opengameart.org/content/the-free-firearm-sound-library
-MODIFIED: Changed class column to caliber
-MODIFIED: Renamed previous class column to gun_type
-MODIFIED: Added or updated audio duration column
-MODIFIED: Clipped audio to 1.00 secs

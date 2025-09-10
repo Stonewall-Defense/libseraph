@@ -12,9 +12,7 @@ from rich import print
 ###############################################################################
 # Local Imports
 ###############################################################################
-from .dataset import SeraphDataset
-from .provenance import ProvenanceActivityType, mark_provenance
-from .version import mark_version_note, VersionBumpType, ChangeType
+from ..lib import SeraphDataset, VersionBumpType, ChangeType, ChangeRecord
 
 
 ###############################################################################
@@ -35,6 +33,7 @@ def prune_files(dataset_dir: str, dry_run: bool):
     files_to_keep = set([record["filename"] for record in metadata_records])
 
     files = os.listdir(data_dir)
+    files_removed = 0
     for f in files:
         fq_filename = os.path.join(data_dir, f)
         if f not in files_to_keep:
@@ -42,6 +41,15 @@ def prune_files(dataset_dir: str, dry_run: bool):
                 print(f"[red bold]REMOVING[/red bold] file {fq_filename}")
             else:
                 os.unlink(fq_filename)
+                files_removed += 1
+
+    if files_removed:
+        change = ChangeRecord(
+            bump_type=VersionBumpType.PATCH,
+            change_type=ChangeType.REMOVE,
+            message=f"Pruned {files_removed} files without corresponding metadata entries",
+        )
+        dataset.register_patch_update(change).save()
 
 
 @prune.command("records")
@@ -65,17 +73,13 @@ def prune_records(dataset_dir: str, dry_run: bool):
 
     if len(idx_to_remove):
         metadata_records = [r for idx, r in enumerate(metadata_records) if idx not in idx_to_remove]
-        dataset.set_metadata_records(metadata_records)
-        dataset.save()
 
-        # Data governance
-        gov_str = f"Pruned {len(idx_to_remove)} records without corresponding files"
-
-        if dataset.track_provenance():
-            mark_provenance(ProvenanceActivityType.MODIFIED, gov_str, dataset_dir)
-
-        if dataset.track_version():
-            mark_version_note(VersionBumpType.PATCH, ChangeType.REMOVE, gov_str)
+        change = ChangeRecord(
+            bump_type=VersionBumpType.PATCH,
+            change_type=ChangeType.REMOVE,
+            message=f"Pruned {len(idx_to_remove)} records without corresponding files",
+        )
+        dataset.set_metadata_records(metadata_records, change_record=change).save()
 
 
 ###############################################################################

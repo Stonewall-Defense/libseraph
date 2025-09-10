@@ -3,6 +3,7 @@
 ###############################################################################
 from collections.abc import Callable
 import csv
+from datetime import datetime, timezone
 from enum import Enum
 import json
 import os
@@ -99,3 +100,10 @@ def get_input(prompt: str,
             return user_input.strip()
         else:
             print(err_prompt)
+
+
+def now():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+def today():
+    return datetime.now().strftime("%Y-%m-%d")

@@ -4,13 +4,17 @@
 from copy import deepcopy
 from dataclasses import dataclass, asdict
 import os
+import pathlib
 from typing import Any, Optional
+import warnings
 
 
 ###############################################################################
 # Local Imports
 ###############################################################################
-from .common import ALLOWED_METADATA_FILENAMES, CLASSFILE_NAME, DATA_DIR, SERAPH_FILENAME, get_metadata_filename, read_csv, write_csv, read_json, write_json
+from .common import ALLOWED_METADATA_FILENAMES, CLASSFILE_NAME, DATA_DIR, SERAPH_FILENAME
+from .common import get_metadata_filename, read_csv, write_csv, read_json, write_json
+from .history import HistoryManager, ChangeRecord, ImportRecord
 
 
 ###############################################################################
@@ -23,16 +27,10 @@ class DatasetAuthor:
 
 
 @dataclass
-class DatasetGovernance:
-    provenance: bool
-    version: bool
-
-
-@dataclass
 class SeraphMetadata:
     uri: str
     name: str
-    version: Optional[str]
+    version: str
     author: Optional[DatasetAuthor]
     keywords: list[str]
     mediaType: Optional[str]
@@ -42,7 +40,12 @@ class SeraphMetadata:
     # mediaMetadata -> [mediaType] -> [mediaSubtype] -> key:value
     mediaMetadata: Optional[dict[str, dict[str, Any]]]
 
-    governance: DatasetGovernance
+
+###############################################################################
+# Errors
+###############################################################################
+class SeraphMetadataError(Exception):
+    pass
 
 
 ###############################################################################
@@ -59,11 +62,6 @@ def _load_seraph_file(fq_filename: str) -> SeraphMetadata:
     else:
         author = None
 
-    governance = DatasetGovernance(
-        provenance=seraph.get("governance", {}).get("provenance", False),
-        version=seraph.get("governance", {}).get("version", False),
-    )
-
     media_type = seraph.get("mediaType", None)
     if media_type and "/" in media_type:
         media_type, media_subtype = media_type.split("/")
@@ -73,13 +71,12 @@ def _load_seraph_file(fq_filename: str) -> SeraphMetadata:
     return SeraphMetadata(
         uri=seraph["uri"],
         name=seraph["name"],
-        version=seraph.get("version", None),
+        version=seraph["version"],
         author=author,
         keywords=seraph.get("keywords", []),
         mediaType=media_type,
         mediaSubtype=media_subtype,
         license=seraph.get("license", None),
-        governance=governance,
         mediaMetadata=seraph.get("mediaMetadata", None),
     )
 
@@ -89,20 +86,25 @@ def _load_seraph_file(fq_filename: str) -> SeraphMetadata:
 ###############################################################################
 class SeraphDataset:
     def __init__(self, dir: str) -> None:
+        # Directory stuff
+        self.dir = dir
+        self.fq_data_dir, self.history_manager = SeraphDataset.ensure_internal_dirs_exist(dir)
+
+        # Sanity check
         SeraphDataset.directory_is_seraph_dataset(dir)
 
-        self.dir = dir
-        self.fq_data_dir = os.path.join(self.dir, DATA_DIR)
-
+        # Metadata
         self.metadata_filename = get_metadata_filename(dir)
         self.fq_metadata_filename = os.path.join(self.dir, self.metadata_filename)
         self.fieldnames, self.metadata = read_csv(self.fq_metadata_filename)
         self.metadata_was_updated = False
 
+        # Seraph
         self.fq_seraph_filename = os.path.join(self.dir, SERAPH_FILENAME)
         self.seraph_metadata = _load_seraph_file(self.fq_seraph_filename)
         self.seraph_was_updated = False
 
+        # Classes
         self.fq_class_filename = os.path.join(self.dir, CLASSFILE_NAME)
         self.classes: list[str] = read_json(self.fq_class_filename)
         self.classes_were_updated = False
@@ -126,31 +128,62 @@ class SeraphDataset:
     def get_data_dir(self):
         return self.fq_data_dir
 
+    def get_history(self):
+        return self.history_manager
+
     ###########################################################################
     # Setters
     ###########################################################################
 
-    def set_metadata_headers(self, fieldnames: list[str]):
+    def set_metadata_headers(self,
+                             fieldnames: list[str],
+                             *,
+                             change_record: Optional[ChangeRecord] = None,
+                             import_record: Optional[ImportRecord] = None,
+                             ):
         self.fieldnames = fieldnames
         self.metadata_was_updated = True
 
+        self.history_manager.register(change=change_record, import_rec=import_record)
+
         return self
 
-    def set_metadata_records(self, records: list[dict]):
+    def set_metadata_records(self,
+                             records: list[dict],
+                             *,
+                             change_record: Optional[ChangeRecord] = None,
+                             import_record: Optional[ImportRecord] = None,
+                             ):
         self.metadata = records
         self.metadata_was_updated = True
 
+        self.history_manager.register(change=change_record, import_rec=import_record)
+
         return self
 
-    def set_seraph_metadata(self, seraph_metadata: SeraphMetadata):
+    def set_seraph_metadata(self,
+                            seraph_metadata: SeraphMetadata,
+                            *,
+                            change_record: Optional[ChangeRecord] = None,
+                            import_record: Optional[ImportRecord] = None,
+                            ):
         self.seraph_metadata = seraph_metadata
         self.seraph_was_updated = True
 
+        self.history_manager.register(change=change_record, import_rec=import_record)
+
         return self
 
-    def set_classes(self, classes: list[str]):
+    def set_classes(self,
+                    classes: list[str],
+                    *,
+                    change_record: Optional[ChangeRecord] = None,
+                    import_record: Optional[ImportRecord] = None,
+                    ):
         self.classes = classes
         self.classes_were_updated = True
+
+        self.history_manager.register(change=change_record, import_rec=import_record)
 
         return self
 
@@ -160,19 +193,36 @@ class SeraphDataset:
                      metadata_records: Optional[list[dict]] = None,
                      seraph_metadata: Optional[SeraphMetadata] = None,
                      classes: Optional[list[str]] = None,
+                     change_records: list[ChangeRecord] = [],
+                     import_records: list[ImportRecord] = [],
                      ):
+        have_updates = False
+
         if metadata_headers:
             self.set_metadata_headers(metadata_headers)
+            have_updates = True
 
         if metadata_records:
             self.set_metadata_records(metadata_records)
+            have_updates = True
 
         if seraph_metadata:
             self.set_seraph_metadata(seraph_metadata)
+            have_updates = True
 
         if classes:
             self.set_classes(classes)
+            have_updates = True
 
+        if have_updates:
+            self.history_manager.register_all(changes=change_records, import_recs=import_records)
+        elif change_records or import_records:
+            warnings.warn("Change/import records were submitted with no updates; ignoring.")
+
+        return self
+
+    def register_patch_update(self, change_record: ChangeRecord):
+        self.history_manager.register_change(change_record)
         return self
 
     ###########################################################################
@@ -190,16 +240,11 @@ class SeraphDataset:
         if self.classes_were_updated:
             write_json(self.fq_class_filename, self.classes)
 
-    def track_provenance(self):
-        return self.seraph_metadata.governance.provenance
-
-    def track_version(self):
-        return self.seraph_metadata.governance.version
+        self.history_manager.save(self.seraph_metadata.version)
 
     ###########################################################################
     # Static Helpers
     ###########################################################################
-
     @staticmethod
     def directory_is_seraph_dataset(dir: str):
         is_dir = os.path.isdir(dir)
@@ -225,3 +270,11 @@ class SeraphDataset:
         has_data_dir = os.path.isdir(data_dir_path)
         if not has_data_dir:
             raise ValueError("Input dir is not a Seraph dataset: no `data/` directory")
+
+    @staticmethod
+    def ensure_internal_dirs_exist(dataset_path: str):
+        # Ensure data dir exists
+        fq_data_dirname = os.path.join(dataset_path, DATA_DIR)
+        pathlib.Path(fq_data_dirname).mkdir(parents=True, exist_ok=True)
+
+        return fq_data_dirname, HistoryManager(dataset_path)

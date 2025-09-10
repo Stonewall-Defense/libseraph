@@ -3,7 +3,6 @@
 ###############################################################################
 import json
 import os
-import pathlib
 from uuid import uuid4
 
 ###############################################################################
@@ -14,7 +13,9 @@ import click
 ###############################################################################
 # Local Imports
 ###############################################################################
-from .common import CLASSFILE_NAME, DATA_DIR, PREFERRED_METADATA_FILENAME, REQUIRED_METADATA_FIELD_NAMES, SERAPH_FILENAME, write_csv, write_json, get_input
+from ..lib.common import CLASSFILE_NAME, PREFERRED_METADATA_FILENAME, REQUIRED_METADATA_FIELD_NAMES, SERAPH_FILENAME
+from ..lib.common import write_csv, write_json, get_input
+from ..lib.history import HistoryManager
 
 
 ###############################################################################
@@ -27,9 +28,6 @@ class MediaTypeError(Exception):
 ###############################################################################
 # Helpers
 ###############################################################################
-
-
-
 def _get_uuid_uri():
     return f"urn:uuid:{uuid4()}"
 
@@ -63,14 +61,14 @@ def init(dataset_path: str, override: bool):
         print(f"Setting random datset URI: {dataset_id}")
 
     dataset_name = get_input("Enter a human-readable dataset name: ",
-                              valid_fn=_string_is_not_empty,
-                              err_prompt="Dataset name cannot be an empty string",
-                              )
+                             valid_fn=_string_is_not_empty,
+                             err_prompt="Dataset name cannot be an empty string",
+                             )
 
     author_id = get_input("Enter your agent @id: ",
-                           valid_fn=_string_is_not_empty,
-                           err_prompt="Agent @id cannot be an empty string",
-                           )
+                          valid_fn=_string_is_not_empty,
+                          err_prompt="Agent @id cannot be an empty string",
+                          )
 
     # TODO: Support CRediT (https://credit.niso.org/) and DataCite (https://datacite-metadata-schema.readthedocs.io/en/4.6/properties/contributor/#a-contributortype)
     author_rel = "associatedWith"
@@ -90,13 +88,7 @@ def init(dataset_path: str, override: bool):
         if keywork_input:
             keywords.append(keywork_input)
 
-    prov_tmp = get_input("Track dataset provenance? [Y/n] ").strip()
-    track_provenance = (not prov_tmp) or prov_tmp.lower() == "y"
-
-    ver_tmp = get_input("Track dataset version? [Y/n] ").strip()
-    track_version = (not ver_tmp) or ver_tmp.lower() == "y"
-
-    # Write the file
+    # Compose the data
     seraph_file_data = {
         "uri": dataset_id,
         "version": "v0.0.0",
@@ -117,30 +109,27 @@ def init(dataset_path: str, override: bool):
     if license:
         seraph_file_data["license"] = license
 
-    if track_provenance or track_version:
-        seraph_file_data["governance"] = {
-            "provenance": track_provenance,
-            "version": track_version,
-        }
-
+    # Write the file itself
     fq_seraph_filename = os.path.join(dataset_path, SERAPH_FILENAME)
     with open(fq_seraph_filename, "x") as outfile:
         outfile.write(json.dumps(seraph_file_data, indent=2))
 
+    # Empty `classes.json` file
     fq_class_filename = os.path.join(dataset_path, CLASSFILE_NAME)
     if os.path.isfile(fq_class_filename) and not override:
         raise RuntimeError("Class file already exists")
     else:
         write_json(fq_class_filename, [])
 
+    # Placeholder `metadata.csv` file
     fq_metadata_filename = os.path.join(dataset_path, PREFERRED_METADATA_FILENAME)
     if os.path.isfile(fq_metadata_filename) and not override:
         raise RuntimeError("Metadata file already exists")
     else:
         write_csv(fq_metadata_filename, REQUIRED_METADATA_FIELD_NAMES, [])
 
-    fq_data_dirname = os.path.join(dataset_path, DATA_DIR)
-    pathlib.Path(fq_data_dirname).mkdir(parents=True, exist_ok=True)
+    # Ensure necessary dirs exists
+    HistoryManager.initialize(dataset_path)
 
 
 ###############################################################################

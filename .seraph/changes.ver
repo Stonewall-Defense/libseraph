@@ -1,6 +1,0 @@
-MAJOR ADD Added data from https://doi.org/10.5281/zenodo.7004819 to dataset
-MAJOR ADD Added data from https://doi.org/10.5281/zenodo.7004819 to dataset
-MAJOR ADD Added data from https://opengameart.org/content/the-free-firearm-sound-library to dataset
-MAJOR CHANGE Changed class column to caliber
-MINOR ADD Added audio duration column
-MINOR CHANGE Clipped audio to 1.00 secs
