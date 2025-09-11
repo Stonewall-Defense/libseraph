@@ -1,9 +1,10 @@
 ###############################################################################
 # Global Imports
 ###############################################################################
+from dataclasses import dataclass
 import re
 import sys
-
+from typing import Optional
 
 ###############################################################################
 # 3PP Imports
@@ -20,6 +21,18 @@ from ..lib import SeraphDataset, SeraphMetadata, ChangeRecord, ImportRecord, now
 
 
 ###############################################################################
+# Classes
+###############################################################################
+@dataclass
+class ProvMeta:
+    seraph: SeraphMetadata
+    prov_version: str
+    prov_used: list[ImportRecord]
+    prov_modified: list[ChangeRecord]
+    prov_was_submitted: bool
+
+
+###############################################################################
 # Constants
 ###############################################################################
 PROV_RECORD_PATTERN = re.compile(r'^(?P<key>[A-Z]+): (?P<value>.+)$')
@@ -32,11 +45,13 @@ def _make_prov_id(seraph: SeraphMetadata):
     return f"{seraph.uri}:{seraph.version}"
 
 
-def _preprocess_prov(dataset: SeraphDataset):
+def _preprocess_prov(dataset: SeraphDataset, version: Optional[str] = None) -> ProvMeta:
     history = dataset.get_history()
     seraph = dataset.get_seraph_metadata()
 
-    prov_used, prov_modified = history.load_current_changes(seraph.version)
+    version_to_use = version or seraph.version
+
+    prov_used, prov_modified = history.load_changes(version_to_use)
 
     if not prov_used and not prov_modified:
         print("[yellow]No provenance changes recorded since last version bump[/yellow]")
@@ -45,10 +60,20 @@ def _preprocess_prov(dataset: SeraphDataset):
         uri_used = [p.uri for p in prov_used]
         prov_modified = [p for p in prov_modified if all([uri not in p.message for uri in uri_used])]
 
-    return seraph, prov_used, prov_modified
+    prov_was_submitted = history.check_prov_submission()
+
+    return ProvMeta(
+        seraph=seraph,
+        prov_version=version_to_use,
+        prov_used=prov_used,
+        prov_modified=prov_modified,
+        prov_was_submitted=prov_was_submitted,
+    )
 
 
-def _submit_dataset(seraph: SeraphMetadata, prov_url: str):
+def _submit_dataset(prov: ProvMeta, prov_url: str):
+    seraph = prov.seraph
+
     target_url = prov_url + "/dataset"
     data = {
         "@id": _make_prov_id(seraph),
@@ -67,9 +92,7 @@ def _submit_dataset(seraph: SeraphMetadata, prov_url: str):
     print(data)
 
 
-def _submit_activity(seraph: SeraphMetadata,
-                     prov_used: list[ImportRecord],
-                     prov_modified: list[ChangeRecord],
+def _submit_activity(prov: ProvMeta,
                      activity_label: str,
                      extra_activity_keywords: list[str],
                      prov_url: str,
@@ -78,11 +101,11 @@ def _submit_activity(seraph: SeraphMetadata,
 
     data = {
         "label": activity_label,
-        "keywords": [m.message for m in prov_modified] + extra_activity_keywords,
-        "used": [u.uri for u in prov_used],
-        "generated": _make_prov_id(seraph),
+        "keywords": [m.message for m in prov.prov_modified] + extra_activity_keywords,
+        "used": [u.uri for u in prov.prov_used],
+        "generated": _make_prov_id(prov.seraph),
         "associatedWith": [
-            seraph.author.uri,  # type: ignore
+            prov.seraph.author.uri,  # type: ignore
         ]
     }
 
@@ -102,20 +125,28 @@ def prov():
 
 @prov.command("show")
 @click.option("--dataset_dir", default=".")
-def show_prov(dataset_dir: str):
+@click.option("--version")
+def show_prov(dataset_dir: str, version: Optional[str]):
     dataset = SeraphDataset(dataset_dir)
-    seraph, prov_used, prov_modified = _preprocess_prov(dataset)
+    prov = _preprocess_prov(dataset, version)
 
-    print(f"[bold white]{seraph.name} provenance updates as of {now()}[/bold white]")
+    title = f"[bold][white]{prov.seraph.name} provenance updates for v{prov.prov_version} as of {now()}[/white] "
+    if prov.prov_was_submitted:
+        title += "[green](SUBMITTED)[/green]"
+    else:
+        title += "[yellow](NOT SUBMITTED)[/yellow]"
 
-    if len(prov_used):
+    title += "[/bold]"
+    print(title)
+
+    if len(prov.prov_used):
         print("\n[bold green]Used[/bold green]")
-        for used in prov_used:
+        for used in prov.prov_used:
             print(f"\t- {used.uri}")
 
-    if len(prov_modified):
+    if len(prov.prov_modified):
         print("\n[bold blue]Modified[/bold blue]")
-        for mod in prov_modified:
+        for mod in prov.prov_modified:
             print(f"\t- {mod.message}")
 
 
@@ -124,17 +155,28 @@ def show_prov(dataset_dir: str):
 @click.option("--activity_label", required=True)
 @click.option("--activity_keywords", multiple=True)
 @click.option("--prov_url", default="https://prospero.sift.net:8000")
+@click.option("--version")
+@click.option("--force", is_flag=True)
 def submit_prov(dataset_dir: str,
                 activity_label: str,
                 activity_keywords: tuple[str],
                 prov_url: str,
+                version: Optional[str],
+                force: bool,
                 ):
 
     dataset = SeraphDataset(dataset_dir)
-    seraph, prov_used, prov_modified = _preprocess_prov(dataset)
+    prov = _preprocess_prov(dataset, version)
 
-    _submit_dataset(seraph, prov_url)
-    _submit_activity(seraph, prov_used, prov_modified, activity_label, list(activity_keywords), prov_url)
+    if prov.prov_was_submitted:
+        if force:
+            print(f"[yellow]Provenance was already submitted for v{prov.prov_version}; resubmitting now ...[/yellow]")
+        else:
+            print(f"[red]Provenance was already submitted for v{prov.prov_version}; retry with `--force` if you're determined to resubmit.[/red]")
+            return
+
+    _submit_dataset(prov, prov_url)
+    _submit_activity(prov, activity_label, list(activity_keywords), prov_url)
 
 
 ###############################################################################

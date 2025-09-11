@@ -309,6 +309,56 @@ def merge_classes_regex(dataset_dir: str,
     dataset.save()
 
 
+@classes.command("drop")
+@click.option("--dataset_dir", default=".")
+@click.option("--class_name", required=True)
+@click.option("--sort_classes", default=True)
+def drop_class(dataset_dir: str,
+               class_name: str,
+               sort_classes: bool,
+               ):
+    # Setup
+    dataset = SeraphDataset(dataset_dir)
+    _, metadata = dataset.get_metadata()
+    class_list = dataset.get_classes()
+
+    # Generate new metadata
+    new_class_list = [c for c in class_list if c != class_name]
+
+    if sort_classes:
+        new_class_list.sort()
+
+    # Process metadata
+    filtered_metadata = []
+
+    for entry in metadata:
+        entry_class_name = entry["class_name"]
+
+        if entry_class_name == class_name:
+            continue
+        else:
+            entry_class_id = new_class_list.index(entry_class_name)
+
+            entry["class_id"] = str(entry_class_id)
+            entry["class_name"] = entry_class_name
+
+            filtered_metadata.append(entry)
+
+    # Save everything
+    gov_str = f"Dropped class {class_name}"
+
+    change = ChangeRecord(
+        bump_type=VersionBumpType.MAJOR,
+        change_type=ChangeType.REMOVE,
+        message=gov_str
+    )
+    dataset.set_multiple(metadata_records=filtered_metadata,
+                         classes=new_class_list,
+                         change_records=[change],
+                         )
+    dataset.save()
+
+
 @classes.command("check-balance")
 @click.option("--dataset_dir", default=".")
 @click.option("--len_col_name")

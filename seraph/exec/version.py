@@ -46,7 +46,10 @@ def _check_highest_version_bump(changes: list[ChangeRecord]) -> VersionBumpType:
     return ret
 
 
-def _determine_next_version(current_version: str, bump_type: VersionBumpType) -> str:
+def _determine_next_version(current_version: str,
+                            bump_type: VersionBumpType,
+                            initial_release: bool,
+                            ) -> str:
     matches = re.match(VERSION_PATTERN, current_version)
     if not matches:
         raise ValueError(f"Invalid version number: {current_version}")
@@ -60,17 +63,22 @@ def _determine_next_version(current_version: str, bump_type: VersionBumpType) ->
 
     segs = [major, minor, patch]
 
-    if bump_type == VersionBumpType.MAJOR:
-        if major == 0:
-            segs = [0, segs[1] + 1, 0]
-        else:
-            segs = [segs[0] + 1, 0, 0]
-    elif bump_type == VersionBumpType.MINOR:
-        segs = [segs[0], segs[1] + 1, 0]
-    elif bump_type == VersionBumpType.MINOR:
-        segs[2] += 1
+    if initial_release and segs[0] == 0:
+        segs = [1, 0, 0]
+    elif initial_release:
+        raise ValueError(f"Version {current_version} cannot be bumped to an initial release")
     else:
-        pass
+        if bump_type == VersionBumpType.MAJOR:
+            if major == 0:
+                segs = [0, segs[1] + 1, 0]
+            else:
+                segs = [segs[0] + 1, 0, 0]
+        elif bump_type == VersionBumpType.MINOR:
+            segs = [segs[0], segs[1] + 1, 0]
+        elif bump_type == VersionBumpType.MINOR:
+            segs[2] += 1
+        else:
+            pass
 
     return ".".join([str(seg) for seg in segs])
 
@@ -84,6 +92,29 @@ def _bump_type_to_color(bump_type: VersionBumpType):
         return "green"
 
 
+def _pprint_change_list(changes: list[ChangeRecord]):
+    changes_add = [c for c in changes if c.change_type == ChangeType.ADD]
+    if len(changes_add):
+        print("\n[bold green]Added[/bold green]")
+        for change in changes_add:
+            prefix = BREAKING_PPRINT_PREFIX if change.bump_type == VersionBumpType.MAJOR else ""
+            print(f"\t- {prefix}{change.message}")
+
+    changes_change = [c for c in changes if c.change_type == ChangeType.CHANGE]
+    if len(changes_change):
+        print("\n[bold blue]Changed[/bold blue]")
+        for change in changes_change:
+            prefix = BREAKING_PPRINT_PREFIX if change.bump_type == VersionBumpType.MAJOR else ""
+            print(f"\t- {prefix}{change.message}")
+
+    changes_remove = [c for c in changes if c.change_type == ChangeType.REMOVE]
+    if len(changes_remove):
+        print("\n[bold strike red]Removed[/bold strike red]")
+        for change in changes_remove:
+            prefix = BREAKING_PPRINT_PREFIX if change.bump_type == VersionBumpType.MAJOR else ""
+            print(f"\t- {prefix}{change.message}")
+
+
 def _write_initial_changelog(fq_changelog_path: str):
     with open(fq_changelog_path, "w") as outfile:
         outfile.write("# Changelog\n\n")
@@ -95,31 +126,31 @@ def _format_release(next_version: str,
                     ):
     ret = io.StringIO()
 
-    ret.write(f"## {next_version} - {today()}")
+    ret.write(f"## {next_version} - {today()}\n\n")
 
     if notice:
-        ret.write(f"_{notice}_")
+        ret.write(f"_{notice}_\n\n")
 
     changes_add = [c for c in change_list if c.change_type == ChangeType.ADD]
     if len(changes_add):
-        ret.write("\n\n### Added\n")
+        ret.write("### Added\n\n")
         for change in changes_add:
             prefix = BREAKING_CHANGELOG_PREFIX if change.bump_type == VersionBumpType.MAJOR else ""
-            ret.write(f"  - {prefix}{change.message}\n")
+            ret.write(f"- {prefix}{change.message}\n")
 
     changes_change = [c for c in change_list if c.change_type == ChangeType.CHANGE]
     if len(changes_change):
-        ret.write("\n\n### Changed\n")
+        ret.write("### Changed\n\n")
         for change in changes_change:
             prefix = BREAKING_CHANGELOG_PREFIX if change.bump_type == VersionBumpType.MAJOR else ""
-            ret.write(f"  - {prefix}{change.message}\n")
+            ret.write(f"- {prefix}{change.message}\n")
 
     changes_remove = [c for c in change_list if c.change_type == ChangeType.REMOVE]
     if len(changes_remove):
-        ret.write("\n\n### Removed\n")
+        ret.write("### Removed\n\n")
         for change in changes_remove:
             prefix = BREAKING_CHANGELOG_PREFIX if change.bump_type == VersionBumpType.MAJOR else ""
-            ret.write(f"  - {prefix}{change.message}\n")
+            ret.write(f"- {prefix}{change.message}\n")
 
     ret.write("\n")
 
@@ -178,59 +209,64 @@ def version_show(dataset_dir: str):
     history = dataset.get_history()
 
     current_version = dataset.get_seraph_metadata().version
-    _, changes = history.load_current_changes(current_version)
+    _, changes = history.load_changes(current_version)
 
     if not changes:
         print("[yellow]No changes recorded since last version bump[/yellow]")
         return
 
     bump_type = _check_highest_version_bump(changes)
-    next_version = _determine_next_version(current_version, bump_type)
+    next_version = _determine_next_version(current_version, bump_type, False)
 
     version_color = _bump_type_to_color(bump_type)
     print(f"[bold][white]{current_version} --> [/white][{version_color}]v{next_version}[/{version_color}][white] - {today()}[/white][/bold]")
 
-    changes_add = [c for c in changes if c.change_type == ChangeType.ADD]
-    if len(changes_add):
-        print("\n[bold green]Added[/bold green]")
-        for change in changes_add:
-            prefix = BREAKING_PPRINT_PREFIX if change.bump_type == VersionBumpType.MAJOR else ""
-            print(f"\t- {prefix}{change.message}")
+    _pprint_change_list(changes)
 
-    changes_change = [c for c in changes if c.change_type == ChangeType.CHANGE]
-    if len(changes_change):
-        print("\n[bold blue]Changed[/bold blue]")
-        for change in changes_change:
-            prefix = BREAKING_PPRINT_PREFIX if change.bump_type == VersionBumpType.MAJOR else ""
-            print(f"\t- {prefix}{change.message}")
 
-    changes_remove = [c for c in changes if c.change_type == ChangeType.REMOVE]
-    if len(changes_remove):
-        print("\n[bold strike red]Removed[/bold strike red]")
-        for change in changes_remove:
-            prefix = BREAKING_PPRINT_PREFIX if change.bump_type == VersionBumpType.MAJOR else ""
-            print(f"\t- {prefix}{change.message}")
+@version.command("list")
+@click.option("--dataset_dir", default=".")
+@click.option("--versions", multiple=True, help="The versions to show, if any")
+def version_list(dataset_dir: str, versions: tuple[str]):
+    dataset = SeraphDataset(dataset_dir)
+    history = dataset.get_history()
+    seraph = dataset.get_seraph_metadata()
+
+    versions_to_pull = list(versions) if versions else None
+    records = history.load_change_list(versions_to_pull)
+
+    print(f"[bold][white]Version history for dataset {seraph.name} as of {today()}[/white][/bold]\n")
+
+    for record in records:
+        prov_str = "[green]WAS[/greed]" if record.prov_was_submitted else "[red]NOT[/red]"
+        print(f"\n[purple]Changes recorded for v{record.version} ({record.datetime})[/purple][white](PROVENANCE {prov_str} SUBMITTED)[/white]")
+        if not record.changes:
+            print("\n[yellow]No changes recorded for this version[/yellow]")
+            continue
+
+        _pprint_change_list(changes=record.changes)
 
 
 @version.command("bump")
 @click.option("--dataset_dir", default=".")
 @click.option("--notice")
+@click.option("--initial_release", is_flag=True, help="Bump directly to version 1.0.0 iff major version is 0")
 @click.option("--dry_run", is_flag=True)
-def version_bump(dataset_dir: str, notice: Optional[str], dry_run: bool):
+def version_bump(dataset_dir: str, notice: Optional[str], initial_release: bool, dry_run: bool):
     # Version
     dataset = SeraphDataset(dataset_dir)
     history = dataset.get_history()
     seraph = dataset.get_seraph_metadata()
 
     current_version = seraph.version
-    _, changes = history.load_current_changes(current_version)
+    _, changes = history.load_changes(current_version)
 
     if not changes:
         print("[yellow]No changes recorded since last version bump[/yellow]")
         return
 
     bump_type = _check_highest_version_bump(changes)
-    next_version = _determine_next_version(current_version, bump_type)
+    next_version = _determine_next_version(current_version, bump_type, initial_release)
 
     if dry_run:
         version_color = _bump_type_to_color(bump_type)
@@ -245,6 +281,8 @@ def version_bump(dataset_dir: str, notice: Optional[str], dry_run: bool):
     fq_changelog_path = os.path.join(dataset_dir, CHANGELOG_FILENAME)
     if not os.path.isfile(fq_changelog_path):
         _write_initial_changelog(fq_changelog_path)
+
+    notice = notice or ("INITIAL RELEASE TO SEMVER v1.0.0" if initial_release else None)
 
     release = _format_release(next_version, changes, notice)
     _update_changelog(release, fq_changelog_path)

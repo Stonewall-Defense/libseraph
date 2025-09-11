@@ -47,6 +47,15 @@ class ChangeRecord:
     message: str
 
 
+@dataclass
+class VersionRecord:
+    version: str
+    datetime: str
+    prov_was_submitted: bool
+    imports: list[ImportRecord]
+    changes: list[ChangeRecord]
+
+
 ###############################################################################
 # Constants
 ###############################################################################
@@ -71,6 +80,16 @@ def change_rec_factory(cur: sqlite3.Cursor, row: sqlite3.Row) -> ChangeRecord:
         bump_type=str_to_enum(row[0], VersionBumpType),
         change_type=str_to_enum(row[1], ChangeType),
         message=row[2],
+    )
+
+
+def version_rec_factory(cur: sqlite3.Cursor, row: sqlite3.Row) -> VersionRecord:
+    return VersionRecord(
+        version=row[0],
+        datetime=row[1],
+        prov_was_submitted=int(row[2]) == 1,
+        imports=[],
+        changes=[],
     )
 
 
@@ -126,30 +145,66 @@ class HistoryManager:
         con = sqlite3.connect(self.fq_change_filename)
 
         with con:
-            query = "INSERT INTO versions VALUES ( ?, ? )"
-            con.execute(query, [next_version, now()])
+            query = "INSERT INTO versions VALUES ( ?, ?, ? )"
+            con.execute(query, [next_version, now(), False])
+        con.close()
+
+    def mark_prov_submission(self, version: Optional[str] = None):
+        con = sqlite3.connect(self.fq_change_filename)
+
+        with con:
+            if not version:
+                cur = con.execute("SELECT version FROM versions ORDER BY datetime DESC limit 1")
+                version = cur.fetchone()[0]
+            query = "UPDATE versions SET prov_submitted = TRUE WHERE version = ?"
+            con.execute(query, [version])
         con.close()
 
     ###########################################################################
     # Read
     ###########################################################################
-    def load_current_changes(self, current_version: str) -> tuple[list[ImportRecord], list[ChangeRecord]]:
+    def load_changes(self, version: Optional[str]) -> tuple[list[ImportRecord], list[ChangeRecord]]:
         con = sqlite3.connect(self.fq_change_filename)
 
         with con:
             cur = con.cursor()
+            version = version or self._get_latest_version(cur)
+            return self._load_changes_for_version(version, cur)
 
-            # Imports
-            cur.row_factory = import_rec_factory
-            cur.execute("SELECT import_uri, import_version, import_classes FROM components WHERE current_version = ?", [current_version])
-            imports = cur.fetchall()
+    def load_change_list(self, versions: Optional[list[str]]):
+        con = sqlite3.connect(self.fq_change_filename)
+        with con:
+            cur = con.cursor()
 
-            # Imports
-            cur.row_factory = change_rec_factory
-            cur.execute("SELECT bump_type, change_type, message FROM modifications WHERE current_version = ?", [current_version])
-            changes = cur.fetchall()
+            # Get version list
+            cur.row_factory = version_rec_factory
+            if versions:
+                cur.execute("SELECT version, datetime, prov_submitted FROM versions WHERE version IN ( ? ) AND version != '0.0.0' ORDER BY datetime DESC", [versions])
+            else:
+                cur.execute("SELECT version, datetime, prov_submitted FROM versions WHERE version != '0.0.0' ORDER BY datetime DESC")
+            versions_fmt: list[VersionRecord] = cur.fetchall()
 
-            return imports, changes
+            for v in versions_fmt:
+                v.imports, v.changes = self._load_changes_for_version(v.version, cur)
+
+            return versions_fmt
+
+    def check_prov_submission(self, version: Optional[str] = None):
+        con = sqlite3.connect(self.fq_change_filename)
+
+        submitted = False
+
+        with con:
+            cur = con.cursor()
+            version = version or self._get_latest_version(cur)
+
+            query = "SELECT prov_submitted FROM versions WHERE version = ?"
+            cur = con.execute(query, [version])
+            val = cur.fetchone()
+            submitted = int(val[0]) == 1
+        con.close()
+
+        return submitted
 
     ###########################################################################
     # Internal Writers
@@ -189,6 +244,27 @@ class HistoryManager:
         self.change_records = []
 
     ###########################################################################
+    # Internal Readers
+    ###########################################################################
+    def _get_latest_version(self, cur: sqlite3.Cursor):
+        cur = cur.execute("SELECT version FROM versions ORDER BY datetime DESC limit 1")
+        version: str = cur.fetchone()[0]
+        return version
+
+    def _load_changes_for_version(self, version: str, cur: sqlite3.Cursor):
+        # Imports
+        cur.row_factory = import_rec_factory
+        cur.execute("SELECT import_uri, import_version, import_classes FROM components WHERE current_version = ?", [version])
+        imports: list[ImportRecord] = cur.fetchall()
+
+        # Changes
+        cur.row_factory = change_rec_factory
+        cur.execute("SELECT bump_type, change_type, message FROM modifications WHERE current_version = ?", [version])
+        changes: list[ChangeRecord] = cur.fetchall()
+
+        return imports, changes
+
+    ###########################################################################
     # Static Helpers
     ###########################################################################
     @staticmethod
@@ -202,11 +278,11 @@ class HistoryManager:
         with con:
             con.execute("CREATE TABLE IF NOT EXISTS components ( current_version, import_uri, import_version, import_classes )")
             con.execute("CREATE TABLE IF NOT EXISTS modifications ( current_version, bump_type, change_type, message )")
-            con.execute("CREATE TABLE IF NOT EXISTS versions ( version, datetime )")
+            con.execute("CREATE TABLE IF NOT EXISTS versions ( version, datetime, prov_submitted )")
 
             cur = con.execute("SELECT * FROM versions LIMIT 1")
             if cur.fetchone() is None:
-                cur.execute("INSERT INTO versions VALUES ( ?, ? )", ["0.0.0", now()])
+                cur.execute("INSERT INTO versions VALUES ( ?, ?, ? )", ["0.0.0", now(), True])
         con.close()
 
         return fq_internal_dirname, fq_change_filename
