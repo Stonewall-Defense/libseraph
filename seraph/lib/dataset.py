@@ -3,6 +3,7 @@
 ###############################################################################
 from copy import deepcopy
 from dataclasses import dataclass, asdict
+from datetime import datetime
 import os
 import pathlib
 from typing import Any, Optional
@@ -13,7 +14,7 @@ import warnings
 # Local Imports
 ###############################################################################
 from .common import ALLOWED_METADATA_FILENAMES, CLASSFILE_NAME, DATA_DIR, SERAPH_FILENAME
-from .common import get_metadata_filename, read_csv, write_csv, read_json, write_json
+from .common import get_metadata_filename, read_csv, write_csv, read_json, write_json, parse_iso_date
 from .history import HistoryManager, ChangeRecord, ImportRecord
 
 
@@ -21,9 +22,27 @@ from .history import HistoryManager, ChangeRecord, ImportRecord
 # Data Classes
 ###############################################################################
 @dataclass
-class DatasetAuthor:
+class Organization:
     uri: str
-    rel: str
+    name: str
+
+    address: Optional[str]
+    identifierScheme: Optional[str]
+
+
+@dataclass
+class DatasetAuthor:
+    # Necessary fields for DataCite and Frictionless DataPackage
+    uri: str
+    name: str
+    roles: list[str]
+
+    # Helpful fields for authors
+    givenName: Optional[str]
+    familyName: Optional[str]
+    identifierScheme: Optional[str]
+    email: Optional[str]
+    affiliations: Optional[list[Organization]]
 
 
 @dataclass
@@ -31,8 +50,9 @@ class SeraphMetadata:
     uri: str
     name: str
     version: str
-    author: Optional[DatasetAuthor]
+    authors: list[DatasetAuthor]
     keywords: list[str]
+    creationDate: datetime
     mediaType: Optional[str]
     mediaSubtype: Optional[str]
     license: Optional[str]
@@ -51,16 +71,71 @@ class SeraphMetadataError(Exception):
 ###############################################################################
 # Helpers
 ###############################################################################
+def _uri_to_identifier_schema(uri: str):
+    fmt_uri = uri.lower()
+
+    if "orcid" in fmt_uri:
+        return "ORCID"
+    elif "isni" in fmt_uri:
+        return "ISNI"
+    elif "ror" in fmt_uri:
+        return "ROR"
+    elif "tag" in fmt_uri:
+        return "tag"
+    elif "uuid" in fmt_uri:
+        return "UUID"
+    else:
+        return None
+
+
+def _load_org(val: dict[str, Any]):
+    return Organization(
+        uri=val["uri"],
+        name=val["name"],
+
+        address=val.get("address", None),
+        identifierScheme=_uri_to_identifier_schema(val["uri"])
+    )
+
+
+def _load_author(val: dict[str, Any]):
+    return DatasetAuthor(
+        uri=val["uri"],
+        name=val["name"],
+        roles=val.get("roles", "associatedWith"),
+
+        # Helpful fields for authors
+        givenName=val.get("givenName", None),
+        familyName=val.get("familyName", None),
+        identifierScheme=_uri_to_identifier_schema(val["uri"]),
+        email=val.get("email", None),
+        affiliations=[_load_org(org) for org in val.get("affiliations", [])],
+    )
+
+
 def _load_seraph_file(fq_filename: str) -> SeraphMetadata:
     seraph = read_json(fq_filename)
 
+    uri = seraph["uri"]
+
     if seraph.get("author", None):
-        author = DatasetAuthor(
+        warnings.warn(f"Dataset {uri} has only one author, but should have a list with at least one entry.", category=DeprecationWarning)
+        authors = [DatasetAuthor(
             uri=seraph["author"]["uri"],
-            rel=seraph["author"]["rel"],
-        )
+            name=seraph["author"].get("name", None),
+            roles=[seraph["author"]["rel"]],
+
+            givenName=None,
+            familyName=None,
+            identifierScheme=None,
+            email=None,
+            affiliations=None,
+        )]
+    elif seraph.get("authors", None):
+        warnings.warn(f"Dataset {uri} has no authors. This will fail to load in future versions.", DeprecationWarning)
+        authors = []
     else:
-        author = None
+        authors = [_load_author(author) for author in seraph["authors"]]
 
     media_type = seraph.get("mediaType", None)
     if media_type and "/" in media_type:
@@ -69,11 +144,12 @@ def _load_seraph_file(fq_filename: str) -> SeraphMetadata:
         media_subtype = seraph.get("mediaSubtype", None)
 
     return SeraphMetadata(
-        uri=seraph["uri"],
+        uri=uri,
         name=seraph["name"],
         version=seraph["version"],
-        author=author,
+        authors=authors,
         keywords=seraph.get("keywords", []),
+        creationDate=parse_iso_date(seraph.get("creationDate", "1970-01-01T00:00:00Z")),
         mediaType=media_type,
         mediaSubtype=media_subtype,
         license=seraph.get("license", None),

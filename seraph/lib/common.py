@@ -9,6 +9,11 @@ import json
 import os
 from typing import Optional, TypeVar
 
+###############################################################################
+# 3PP Imports
+###############################################################################
+from urllib.parse import urlparse
+
 
 ###############################################################################
 # Types and Classes
@@ -21,6 +26,17 @@ T = TypeVar("T", bound=Enum)
 ###############################################################################
 class EnumArgumentError(Exception):
     pass
+
+
+###############################################################################
+# Enums
+###############################################################################
+class VerifyOutputFormat(Enum):
+    PRINT = "print"
+    CSV = "csv"
+
+
+VERIFY_OUTPUT_FORMATS = [val.value for val in VerifyOutputFormat]
 
 
 ###############################################################################
@@ -42,6 +58,8 @@ DATA_DIR = "data"
 REQUIRED_METADATA_FIELD_NAMES = ["class_id", "class_name", "filename"]
 
 REQUIRED_METADATA_IMPORT_COLS = ["original_dataset_uri", "license"]
+
+VALID_MEDIA_TYPES = ["audio", "image", "multimedia", "text", "video"]
 
 
 ###############################################################################
@@ -89,7 +107,7 @@ def get_input(prompt: str,
               *,
               valid_fn: Optional[Callable[[str], bool]] = None,
               err_prompt="Invalid input",
-              ) -> str:
+              ) -> str | None:
     while True:
         user_input = input(prompt)
         is_valid = True
@@ -105,5 +123,15 @@ def get_input(prompt: str,
 def now():
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
+
 def today():
     return datetime.now().strftime("%Y-%m-%d")
+
+
+def parse_iso_date(date_string: str):
+    return datetime.strptime(date_string, "%Y-%m-%dT%H:%M:%SZ")
+
+
+def is_web_url(val: str) -> bool:
+    parsed = urlparse(val)
+    return parsed.scheme.startswith("http") and bool(parsed.netloc)

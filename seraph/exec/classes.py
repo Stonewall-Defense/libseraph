@@ -266,7 +266,7 @@ def merge_classes_regex(dataset_dir: str,
     # Sanity checks
     if not len(metadata):
         raise NotImplementedError("For now, there must be metadata in the file to execute this operation")
-    elif not len(class_merge_regex):
+    elif class_merge_regex is None or not len(class_merge_regex):
         raise ValueError("Must specify a regex to capture classes")
 
     pattern = re.compile(class_merge_regex)

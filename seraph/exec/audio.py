@@ -27,7 +27,9 @@ import torchaudio
 ###############################################################################
 # Local Imports
 ###############################################################################
-from ..lib import REQUIRED_METADATA_FIELD_NAMES, REQUIRED_METADATA_IMPORT_COLS, str_to_enum, write_csv, SeraphDataset, VersionBumpType, ChangeType, ChangeRecord, ImportRecord, SeraphMetadataError
+from ..lib import REQUIRED_METADATA_FIELD_NAMES, REQUIRED_METADATA_IMPORT_COLS, VERIFY_OUTPUT_FORMATS
+from ..lib import str_to_enum, write_csv
+from ..lib import SeraphDataset, VersionBumpType, ChangeType, ChangeRecord, ImportRecord, SeraphMetadataError, VerifyOutputFormat
 
 
 ###############################################################################
@@ -67,11 +69,6 @@ class ClipEndStrategy(Enum):
     DISCARD = "discard"
 
 
-class VerifyOutputFormat(Enum):
-    PRINT = "print"
-    CSV = "csv"
-
-
 AUDIO_BASE_MERGE_STRATEGIES = [val.value for val in AudioBaseMergeStrategy]
 AUDIO_MIX_MERGE_STRATEGIES = [val.value for val in AudioMixMergeStrategy]
 
@@ -79,8 +76,6 @@ METADATA_FIELD_MERGE_STRATEGIES = [val.value for val in MetadataFieldMergeStrate
 METADATA_COLUMN_CONFLICT_STRATEGIES = [val.value for val in MetadataColumnConflictStrategy]
 
 CLIP_END_STRAEGIES = [val.value for val in ClipEndStrategy]
-
-VERIFY_OUTPUT_FORMATS = [val.value for val in VerifyOutputFormat]
 
 
 ###############################################################################
@@ -106,6 +101,7 @@ class VerifyError:
     sample_rate: Optional[int]
     channels: Optional[int]
     bit_depth: Optional[int]
+    is_empty: bool
 
 
 ###############################################################################
@@ -488,6 +484,11 @@ def _write_audio_clips(record: FileToClip, data_dir: str):
     fq_input_filename = os.path.join(data_dir, record.filename)
     audio, sr = torchaudio.load(fq_input_filename, normalize=True)
 
+    if len(record.clips) == 1:
+        fq_output_filename = os.path.join(data_dir, record.clips[0].clip_filename)
+        os.rename(fq_input_filename, fq_output_filename)
+        return
+
     for clip in record.clips:
         fq_output_filename = os.path.join(data_dir, clip.clip_filename)
         start_frame = int(clip.start_secs * sr)
@@ -530,8 +531,10 @@ def _clip_audio_files(dataset: SeraphDataset,
     if not have_duration_column:
         raise ValueError("No duration column found")
 
-    headers.append("file_id")
-    headers.append("clip_id")
+    CLIP_HEADERS_TO_ADD = ["file_id", "clip_id"]
+    for h in CLIP_HEADERS_TO_ADD:
+        if h not in headers:
+            headers.append(h)
 
     # Do the clipping
     clipped_metadata = []
@@ -688,6 +691,8 @@ def audio_add_duration(dataset_dir: str,
     elif col_strat == MetadataColumnConflictStrategy.REPLACE:
         fieldnames = [f for f in fieldnames if f not in duration_cols]
         fieldnames.append(DURATION_COL_DEFAULT_NAME)
+    else:
+        fieldnames.append(DURATION_COL_DEFAULT_NAME)
 
     data_dir = dataset.get_data_dir()
     for entry in tqdm(metadata, "Processing file durations"):
@@ -767,7 +772,8 @@ def audio_resample(dataset_dir: str, target_sr: int):
 @audio.command("verify")
 @click.option("--dataset_dir", default=".")
 @click.option("--output_format", default="print", type=click.Choice(VERIFY_OUTPUT_FORMATS))
-def audio_verify(dataset_dir: str, output_format: str):
+@click.option("--check_has_data", is_flag=True)
+def audio_verify(dataset_dir: str, output_format: str, check_has_data: bool):
     dataset = SeraphDataset(dataset_dir)
 
     seraph = dataset.get_seraph_metadata()
@@ -784,7 +790,7 @@ def audio_verify(dataset_dir: str, output_format: str):
     violations: list[VerifyError] = []
 
     for f in tqdm(files, "Scanning for dataset contract violations"):
-        violation = VerifyError(filename=f, subtype=None, sample_rate=None, channels=None, bit_depth=None)
+        violation = VerifyError(filename=f, subtype=None, sample_rate=None, channels=None, bit_depth=None, is_empty=False)
 
         ext = f.split(".")[-1]
         expected_meta = audio_meta.get(ext, None)
@@ -804,6 +810,9 @@ def audio_verify(dataset_dir: str, output_format: str):
         if expected_meta["bitsPerSample"] != file_meta.bitdepth:
             violation.bit_depth = file_meta.bitdepth
 
+        if check_has_data and (file_meta.duration is None or file_meta.duration < 0.01):
+            violation.is_empty = True
+
         have_violation = violation.subtype or violation.sample_rate or violation.channels or violation.bit_depth
         if have_violation:
             violations.append(violation)
@@ -811,7 +820,7 @@ def audio_verify(dataset_dir: str, output_format: str):
     if not violations:
         print("[bold green]No dataset contract violations![bold green]")
     else:
-        COLUMNS = ["filename", "subtype", "sample_rate", "channels", "bit_depth"]
+        COLUMNS = ["filename", "subtype", "sample_rate", "channels", "bit_depth", "is_empty"]
         if fmt == VerifyOutputFormat.CSV:
             write_csv("verification-errors.csv",
                       COLUMNS,
