@@ -272,6 +272,7 @@ class SeraphDataset:
 
         if self.seraph_was_updated:
             seraph_file_data = asdict(self.seraph_metadata)
+            seraph_file_data["creationDate"] = self.seraph_metadata.creationDate.strftime("%Y-%m-%dT%H:%M:%SZ")
             write_json(self.fq_seraph_filename, seraph_file_data)
 
         if self.classes_were_updated:

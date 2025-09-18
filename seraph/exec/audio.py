@@ -873,6 +873,43 @@ def audio_verify(dataset_dir: str, output_format: str, check_file_len: bool, che
             print(table)
 
 
+@audio.command("prune")
+@click.option("--dataset_dir", default=".")
+@click.option("--remove_zero_len", is_flag=True, help="Remove files with duration of 0 sec")
+@click.option("--remove_silence", is_flag=True, help="Remove files that contain only silence")
+def audio_prune(dataset_dir: str, remove_zero_len: bool, remove_silence: bool):
+    dataset = SeraphDataset(dataset_dir)
+    data_dir = dataset.get_data_dir()
+    _, original_metadata_records = dataset.get_metadata()
+
+    if not remove_zero_len and not remove_silence:
+        print("[red]You must specify at least one removal parameter: `remove_zero_len`, `remove_silence`[/red]")
+
+    new_metadata_records = []
+
+    for record in tqdm(original_metadata_records, "Pruning audio files"):
+        filename = record["filename"]
+        fq_filename = os.path.join(data_dir, filename)
+        file_meta = TinyTag.get(fq_filename)
+
+        is_zero_len = remove_zero_len and (file_meta.duration is None or file_meta.duration < 0.01)
+        is_silence = remove_silence and not _check_has_audio(fq_filename)
+
+        if is_zero_len or is_silence:
+            os.unlink(fq_filename)
+        else:
+            new_metadata_records.append(record)
+
+    delta = len(original_metadata_records) - len(new_metadata_records)
+    if delta != 0:
+        change = ChangeRecord(
+            bump_type=VersionBumpType.PATCH,
+            change_type=ChangeType.REMOVE,
+            message=f"Pruned {delta} records without audio data",
+        )
+        dataset.set_metadata_records(new_metadata_records, change_record=change).save()
+
+
 ###############################################################################
 # ! Main
 ###############################################################################

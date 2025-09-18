@@ -23,15 +23,8 @@ from asaperson import orcid_to_person, isni_to_person, vcf_to_person
 # Local Imports
 ###############################################################################
 from ..lib import CLASSFILE_NAME, PREFERRED_METADATA_FILENAME, REQUIRED_METADATA_FIELD_NAMES, SERAPH_FILENAME, VERIFY_OUTPUT_FORMATS, VALID_MEDIA_TYPES, DEFAULT_AUTHOR_ROLE
-from ..lib import write_csv, write_json, get_user_input, str_to_enum, now, load_license, print_license_concerns, check_role_in_known_taxonomy, uri_to_identifier_schema
+from ..lib import write_csv, write_json, get_user_input, str_to_enum, now, load_license, print_license_concerns, check_role_in_known_taxonomy, uri_to_identifier_schema, check_media_type
 from ..lib import HistoryManager, VerifyOutputFormat, SeraphDataset, ChangeRecord, VersionBumpType, ChangeType, DatasetAuthor, RoleTaxonomy
-
-
-###############################################################################
-# Errors
-###############################################################################
-class MediaTypeError(Exception):
-    pass
 
 
 ###############################################################################
@@ -45,38 +38,22 @@ def _string_is_not_empty(arg: str) -> bool:
     return len(arg.strip()) > 0
 
 
-def _media_type_is_valid(arg: str) -> bool:
-    return any([arg.startswith(m) for m in VALID_MEDIA_TYPES])
-
-
-def _has_media_subtype(arg: str) -> bool:
-    try:
-        idx = arg.index("/")
-        if idx == 0 or idx == len(arg) - 1:
-            raise MediaTypeError(f"Invalid media type: {arg}")
-        else:
-            return True
-    except ValueError:
-        return False
-
-
 def _get_media_type_from_user():
     media_type, media_subtype = None, None
-    has_media_subtype = False
 
     while True:
-        media_type = get_user_input("Enter the dataset media type: ", valid_fn=_media_type_is_valid, err_prompt=f"Media type must be one of: {VALID_MEDIA_TYPES}")
+        media_type = get_user_input("Enter the dataset media type: ", valid_fn=_string_is_not_empty, err_prompt=f"Media type must be one of: {VALID_MEDIA_TYPES}")
         if not media_type:
             continue
 
-        has_media_subtype = _has_media_subtype(media_type)
-        if media_type.startswith("multimedia") and has_media_subtype:
-            print("Multimedia datasets MUST NOT specify a `mediaSubtype`")
-            continue
-        else:
+        try:
+            media_type, media_subtype = check_media_type(media_type)
             break
+        except ValueError as e:
+            print(f"[red]{format(e)}[/red]")
+            continue
 
-    if media_type and not _has_media_subtype(media_type):
+    if not media_subtype:
         media_subtype = get_user_input("Enter the dataset media subtype: ")
 
     return media_type, media_subtype

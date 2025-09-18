@@ -6,3 +6,4 @@ from .author import Organization, DatasetAuthor, NameIdentifierScheme, RoleTaxon
 from .dataset import SeraphMetadata, SeraphDataset, SeraphMetadataError
 from .history import HistoryManager, ChangeType, VersionBumpType, ImportRecord, ChangeRecord
 from .license import License, LicenseConformance, LicenseStatus, load_license, print_license_concerns
+from .media_type import check_media_type

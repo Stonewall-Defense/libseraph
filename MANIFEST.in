@@ -1,1 +1,1 @@
-include seraph/lib/*.json
+include seraph/lib/data/**/*

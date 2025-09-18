@@ -51,7 +51,7 @@ class License:
 # Config
 ###############################################################################
 _DIR_PATH = os.path.dirname(os.path.realpath(__file__))
-_LICENSES_PATH = os.path.join(_DIR_PATH, "licenses.json")
+_LICENSES_PATH = os.path.join(_DIR_PATH, "data/licenses.json")
 
 ALL_LICENSES: list[dict[str, str]] = read_json(_LICENSES_PATH).values()
 
