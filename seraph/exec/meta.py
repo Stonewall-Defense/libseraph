@@ -1,6 +1,7 @@
 ###############################################################################
 # Global Imports
 ###############################################################################
+from dataclasses import asdict
 from itertools import zip_longest
 import json
 import os
@@ -14,11 +15,16 @@ from rich import print
 from rich.table import Table
 
 ###############################################################################
+# Certus Imports
+###############################################################################
+from asaperson import orcid_to_person, isni_to_person, vcf_to_person
+
+###############################################################################
 # Local Imports
 ###############################################################################
-from ..lib import CLASSFILE_NAME, PREFERRED_METADATA_FILENAME, REQUIRED_METADATA_FIELD_NAMES, SERAPH_FILENAME, VERIFY_OUTPUT_FORMATS, VALID_MEDIA_TYPES
-from ..lib import write_csv, write_json, get_input, str_to_enum, now, load_license, print_license_concerns
-from ..lib import HistoryManager, VerifyOutputFormat, SeraphDataset, ChangeRecord, VersionBumpType, ChangeType
+from ..lib import CLASSFILE_NAME, PREFERRED_METADATA_FILENAME, REQUIRED_METADATA_FIELD_NAMES, SERAPH_FILENAME, VERIFY_OUTPUT_FORMATS, VALID_MEDIA_TYPES, DEFAULT_AUTHOR_ROLE
+from ..lib import write_csv, write_json, get_user_input, str_to_enum, now, load_license, print_license_concerns, check_role_in_known_taxonomy, uri_to_identifier_schema
+from ..lib import HistoryManager, VerifyOutputFormat, SeraphDataset, ChangeRecord, VersionBumpType, ChangeType, DatasetAuthor, RoleTaxonomy
 
 
 ###############################################################################
@@ -59,7 +65,7 @@ def _get_media_type_from_user():
     has_media_subtype = False
 
     while True:
-        media_type = get_input("Enter the dataset media type: ", valid_fn=_media_type_is_valid, err_prompt=f"Media type must be one of: {VALID_MEDIA_TYPES}")
+        media_type = get_user_input("Enter the dataset media type: ", valid_fn=_media_type_is_valid, err_prompt=f"Media type must be one of: {VALID_MEDIA_TYPES}")
         if not media_type:
             continue
 
@@ -70,72 +76,104 @@ def _get_media_type_from_user():
         else:
             break
 
-
     if media_type and not _has_media_subtype(media_type):
-        media_subtype = get_input("Enter the dataset media subtype: ")
-    
+        media_subtype = get_user_input("Enter the dataset media subtype: ")
+
     return media_type, media_subtype
 
 
 def _get_license_from_user():
     license = None
     while license is None:
-        license = get_input("Enter the dataset license: ", valid_fn=_string_is_not_empty, err_prompt="A dataset must have a license")
+        license = get_user_input("Enter the dataset license: ", valid_fn=_string_is_not_empty, err_prompt="A dataset must have a license")
 
     lookup = load_license(license)
     print_license_concerns(lookup)
     return license
 
 
-# TODO: Finish this!
+def _process_author_uri(uri: str):
+    author = None
+
+    if "orcid" in uri:
+        try:
+            author = orcid_to_person(uri)
+        except ValueError:
+            print(f"[red]Unable to dereference probable ORCID {uri}[/red]")
+    elif "isni" in uri:
+        try:
+            author = isni_to_person(uri)
+        except ValueError:
+            print(f"[red]Unable to dereference probable ISNI {uri}[/red]")
+    elif uri.startswith("urn:uuid") or uri.startswith("tag"):
+        pass    # This is fine; these can't be dereferenced
+    else:
+        try:
+            author = vcf_to_person(uri)
+        except ValueError:
+            print(f"[yellow]Unknown author URI {uri} is not a VCF[/yellow]")
+
+    return author
+
+
 def _get_authors_from_user():
-    authors = []
+    authors: list[DatasetAuthor] = []
     have_author_data = True
     while have_author_data and not authors:
-        author_id = get_input("Enter author URI: " if not authors else "Enter another author URI (optional): ",
-                              valid_fn=_string_is_not_empty,
-                              err_prompt="author URI cannot be an empty string",
-                              )
+        # Get an ID or bail on the rest of the loop
+        author_id = get_user_input("Enter author URI: " if not authors else "Enter another author URI (optional): ",
+                                   valid_fn=_string_is_not_empty,
+                                   err_prompt="Author URI cannot be an empty string",
+                                   )
         if not author_id:
             continue
 
+        # Can this be cleaned up at all? We have to wait to assemble the DatasetAuthor object until after role(s) are assigned ...
         author_metadata = _process_author_uri(author_id)
         if not author_metadata:
             author_name = ""
             while not author_name:
-                author_name = get_input("Enter Author Name: ", valid_fn=_string_is_not_empty, err_prompt="Author name cannot be empty")
+                author_name = get_user_input("Enter Author Name: ", valid_fn=_string_is_not_empty, err_prompt="Author name cannot be empty")
         else:
-            author_name = ""
-            pass    # TODO: Add this feature
+            author_name = ""    # Placeholder, not used
 
+        # Assign roles, prferably from a known list
         author_roles = []
         author_role = ""
-        # TODO: Support CRediT (https://credit.niso.org/) and DataCite (https://datacite-metadata-schema.readthedocs.io/en/4.6/properties/contributor/#a-contributortype)
-        while not author_roles or author_role and author_role != "associatedWith":
-            author_role = get_input(f"Add author role {'(default: `associatedWith`)' if not author_roles else '(optional)'}: ")
+
+        # Continue until we have something OR we have at least one non-default role and they give us nothing
+        while not author_roles or (author_role and author_role != DEFAULT_AUTHOR_ROLE):
+            author_role = get_user_input(f"Add author role {f'(default: `associatedWith`)' if not author_roles else '(optional)'}: ")
+
+            # Apply default iff no existing role
             if not author_role and not author_roles:
-                author_role = "associatedWith"
+                author_role = DEFAULT_AUTHOR_ROLE
+
+            # If not default, prompt if this may not be the best option
+            if author_role and author_role != DEFAULT_AUTHOR_ROLE:
+                role_type = check_role_in_known_taxonomy(author_role)
+                if role_type == RoleTaxonomy.NONE:
+                    print("[yellow]WARNING: Prefer roles from known taxonomies such as CRediT or DataCite[/yellow]")
+
+            # Save the role iff we have a role
             if author_role:
                 author_roles.append(author_role)
 
-        authors.append({
-            "uri": author_id,
-            "name": author_name,
-            "roles": author_roles,
-        })
+        authors.append(DatasetAuthor(
+            # Necessary fields
+            uri=author_id,
+            name=author_metadata.name if author_metadata else author_name,
+            roles=author_roles,
 
+            # Optional fields
+            givenName=author_metadata.given_name if author_metadata else None,
+            familyName=author_metadata.family_name if author_metadata else None,
+            identifierScheme=uri_to_identifier_schema(author_id),
+            email=author_metadata.email if author_metadata else None,
+            affiliations=None
+        ))
 
-def _process_author_uri(uri: str):
-    if uri.startswith("http"):
-        # ORCID, ISNI, vCard, hCard, jCard, FOAF
-        print("[orange]One day we'll support HTTP lookup ...[/orange]")
-    elif os.path.isfile(uri):
-        # vCard, hCard, jCard, FOAF
-        print("[orange]One day we'll support file parsing ...[/orange]")
-    else:
-        print("[red]No plans to support `tag` URIs[/red]")
-
-    return None
+    return authors
 
 
 ###############################################################################
@@ -151,15 +189,15 @@ def meta():
 @click.option("--override", default=False)
 def meta_init(dataset_path: str, override: bool):
     # Get the core metadata fields from the user
-    dataset_id = get_input("Enter a dataset ID: ")
+    dataset_id = get_user_input("Enter a dataset ID: ")
     if not dataset_id:
         dataset_id = _get_uuid_uri()
         print(f"Setting random datset URI: {dataset_id}")
 
-    dataset_name = get_input("Enter a human-readable dataset name: ",
-                             valid_fn=_string_is_not_empty,
-                             err_prompt="Dataset name cannot be an empty string",
-                             )
+    dataset_name = get_user_input("Enter a human-readable dataset name: ",
+                                  valid_fn=_string_is_not_empty,
+                                  err_prompt="Dataset name cannot be an empty string",
+                                  )
 
     # Media type validation logic is a bit more complex
     media_type, media_subtype = _get_media_type_from_user()
@@ -174,7 +212,7 @@ def meta_init(dataset_path: str, override: bool):
     keywords = []
     keywork_input = "placeholder"
     while keywork_input:
-        keywork_input = get_input("Add keyword(s) to the dataset: ")
+        keywork_input = get_user_input(f"Add {'more ' if keywords else ''}keyword(s) to the dataset: ")
         if keywork_input:
             keywords.append(keywork_input)
 
@@ -183,7 +221,7 @@ def meta_init(dataset_path: str, override: bool):
         "uri": dataset_id,
         "version": "v0.0.0",
         "name": dataset_name,
-        "authors": authors,
+        "authors": [asdict(a) for a in authors],
         "keywords": keywords,
         "creationDate": now(),
     }

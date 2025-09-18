@@ -17,7 +17,7 @@ from rich.table import Column, Table
 ###############################################################################
 # Local Imports
 ###############################################################################
-from ..lib import read_csv, write_csv, write_json, get_input, get_metadata_filename, SeraphDataset, VersionBumpType, ChangeType, ChangeRecord, CLASSFILE_NAME
+from ..lib import read_csv, write_csv, write_json, get_user_input, get_metadata_filename, SeraphDataset, VersionBumpType, ChangeType, ChangeRecord, CLASSFILE_NAME
 
 
 ###############################################################################
@@ -261,7 +261,7 @@ def merge_classes_regex(dataset_dir: str,
     fields, metadata = dataset.get_metadata()
     class_list = dataset.get_classes()
 
-    class_merge_regex = get_input("Class merge regex: ")
+    class_merge_regex = get_user_input("Class merge regex: ")
 
     # Sanity checks
     if not len(metadata):

@@ -83,7 +83,7 @@ def _stat_str(stat: LicenseStatus):
 
 def _format_license_concerns(license: Optional[License]) -> str:
     if not license:
-        return "[yellow]That license is not registered with https://opendefinition.org/[/yellow]"
+        return "[yellow]WARNING: That license is not registered with https://opendefinition.org/[/yellow]"
 
     ret = " > Possible license concerns: "
 

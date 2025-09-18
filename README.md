@@ -21,7 +21,7 @@ conda deactivate
 conda activate seraph
 
 # Initialize new dataset
-seraph init
+seraph meta init
 
 # Import audio datasets
 seraph audio import --import_dir ~/Desktop/TEAM-ML/datasets/component/dart/free-firearm-sounds/

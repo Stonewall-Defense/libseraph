@@ -1,1 +1,1 @@
-from .meta import MediaTypeError # noqa
+from .meta import MediaTypeError

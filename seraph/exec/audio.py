@@ -102,6 +102,10 @@ class VerifyError:
     channels: Optional[int]
     bit_depth: Optional[int]
     is_empty: bool
+    no_audio: bool
+
+    def has_violation(self):
+        return self.subtype or self.sample_rate or self.channels or self.bit_depth or self.is_empty or self.no_audio
 
 
 ###############################################################################
@@ -622,6 +626,36 @@ def _clip_audio_files(dataset: SeraphDataset,
         write_csv("clipped_metadata.csv", headers, clipped_metadata)
 
 
+def _check_has_audio(fq_filename: str):
+    wave, sr = torchaudio.load(fq_filename)
+
+    # Mel Spectrogram
+    mel_spec = torchaudio.transforms.MelSpectrogram(
+        sample_rate=sr,
+        n_fft=1024,
+        n_mels=128,
+        hop_length=512,
+        normalized=False,
+    )
+    mel_output = mel_spec(wave).squeeze()
+    log_mel_output = torchaudio.transforms.AmplitudeToDB(top_db=80)(mel_output)
+
+    # Check spectrogram
+    min_in_val = torch.min(log_mel_output).item()
+    max_in_val = torch.max(log_mel_output).item()
+    in_span = max_in_val - min_in_val
+    return in_span != 0
+
+
+def _fmt_col(val: str | bool | None | int):
+    if val is None or (isinstance(val, str) and not val):
+        return "-"
+    elif not val:
+        return str(val)
+    else:
+        return f"[red]{val}[/red]"
+
+
 ###############################################################################
 # ! Commands
 ###############################################################################
@@ -772,8 +806,9 @@ def audio_resample(dataset_dir: str, target_sr: int):
 @audio.command("verify")
 @click.option("--dataset_dir", default=".")
 @click.option("--output_format", default="print", type=click.Choice(VERIFY_OUTPUT_FORMATS))
-@click.option("--check_has_data", is_flag=True)
-def audio_verify(dataset_dir: str, output_format: str, check_has_data: bool):
+@click.option("--check_file_len", is_flag=True, help="Warn of files with no audio length")
+@click.option("--check_has_data", is_flag=True, help="Warn of files with no audio data (i.e., silence)")
+def audio_verify(dataset_dir: str, output_format: str, check_file_len: bool, check_has_data: bool):
     dataset = SeraphDataset(dataset_dir)
 
     seraph = dataset.get_seraph_metadata()
@@ -790,7 +825,7 @@ def audio_verify(dataset_dir: str, output_format: str, check_has_data: bool):
     violations: list[VerifyError] = []
 
     for f in tqdm(files, "Scanning for dataset contract violations"):
-        violation = VerifyError(filename=f, subtype=None, sample_rate=None, channels=None, bit_depth=None, is_empty=False)
+        violation = VerifyError(filename=f, subtype=None, sample_rate=None, channels=None, bit_depth=None, is_empty=False, no_audio=False)
 
         ext = f.split(".")[-1]
         expected_meta = audio_meta.get(ext, None)
@@ -810,17 +845,19 @@ def audio_verify(dataset_dir: str, output_format: str, check_has_data: bool):
         if expected_meta["bitsPerSample"] != file_meta.bitdepth:
             violation.bit_depth = file_meta.bitdepth
 
-        if check_has_data and (file_meta.duration is None or file_meta.duration < 0.01):
+        if check_file_len and (file_meta.duration is None or file_meta.duration < 0.01):
             violation.is_empty = True
 
-        have_violation = violation.subtype or violation.sample_rate or violation.channels or violation.bit_depth
-        if have_violation:
+        if check_has_data and not _check_has_audio(fq_filename):
+            violation.no_audio = True
+
+        if violation.has_violation():
             violations.append(violation)
 
     if not violations:
         print("[bold green]No dataset contract violations![bold green]")
     else:
-        COLUMNS = ["filename", "subtype", "sample_rate", "channels", "bit_depth", "is_empty"]
+        COLUMNS = ["filename", "subtype", "sample_rate", "channels", "bit_depth", "is_empty", "no_audio"]
         if fmt == VerifyOutputFormat.CSV:
             write_csv("verification-errors.csv",
                       COLUMNS,
@@ -828,11 +865,11 @@ def audio_verify(dataset_dir: str, output_format: str, check_has_data: bool):
         else:
             table = Table(
                 *COLUMNS,
-                title="Dataset Contract Violations"
+                title=f"Dataset Contract Violations ({len(violations)})"
             )
 
             for v in violations:
-                table.add_row(v.filename, v.subtype, str(v.sample_rate), str(v.channels), str(v.bit_depth))
+                table.add_row(v.filename, _fmt_col(v.subtype), _fmt_col(v.sample_rate), _fmt_col(v.channels), _fmt_col(v.bit_depth), _fmt_col(v.is_empty), _fmt_col(v.no_audio))
             print(table)
 
 

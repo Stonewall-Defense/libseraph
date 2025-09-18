@@ -103,7 +103,7 @@ def str_to_enum(arg: str, target_enum: type[T]) -> T:
         raise EnumArgumentError(f"Invalid value {arg} for enumerated type {type(target_enum)}; must be one of {[val.name for val in target_enum]}")
 
 
-def get_input(prompt: str,
+def get_user_input(prompt: str,
               *,
               valid_fn: Optional[Callable[[str], bool]] = None,
               err_prompt="Invalid input",
