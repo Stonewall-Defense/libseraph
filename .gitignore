@@ -176,3 +176,6 @@ pyrightconfig.json
 seraph.json
 *classes*.json
 *meta*.csv
+
+# namaste
+[0-4]=*

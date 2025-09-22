@@ -17,7 +17,7 @@ from rich import print
 ###############################################################################
 # Local Imports
 ###############################################################################
-from ..lib import SeraphDataset, SeraphMetadata, ChangeRecord, ImportRecord, now
+from ..lib import SeraphDataset, SeraphMetadata, ChangeRecord, ImportRecord, now, load_license
 
 
 ###############################################################################
@@ -57,8 +57,7 @@ def _preprocess_prov(dataset: SeraphDataset, version: Optional[str] = None) -> P
         print("[yellow]No provenance changes recorded since last version bump[/yellow]")
         sys.exit(0)
     else:
-        uri_used = [p.uri for p in prov_used]
-        prov_modified = [p for p in prov_modified if all([uri not in p.message for uri in uri_used])]
+        prov_modified = [p for p in prov_modified if not p.is_import]
 
     prov_was_submitted = history.check_prov_submission()
 
@@ -87,9 +86,8 @@ def _submit_dataset(prov: ProvMeta, prov_url: str):
         ]
     }
 
-    # response = requests.put(target_url, json=data)
-    # response.raise_for_status()
-    print(data)
+    response = requests.put(target_url, json=data)
+    response.raise_for_status()
 
 
 def _submit_activity(prov: ProvMeta,
@@ -109,10 +107,29 @@ def _submit_activity(prov: ProvMeta,
         ]
     }
 
-    # response = requests.put(target_url, json=data)
-    # response.raise_for_status()
-    # return response.text
-    print(data)
+    response = requests.put(target_url, json=data)
+    response.raise_for_status()
+    return response.text
+
+
+def _submit_license(prov: ProvMeta, prov_url: str):
+    uri = _make_prov_id(prov.seraph)
+    license = prov.seraph.license
+
+    if not license:
+        raise ValueError(f"No license recorded for dataset {uri}")
+    full_license = load_license(license)
+
+    target_url = prov_url + "/tag_with"
+
+    data = {
+        "in": uri,
+        "out": full_license.url if full_license else license
+    }
+
+    response = requests.put(target_url, json=data)
+    response.raise_for_status()
+    return response.text
 
 
 ###############################################################################
@@ -157,12 +174,14 @@ def show_prov(dataset_dir: str, version: Optional[str]):
 @click.option("--prov_url", default="https://prospero.sift.net:8000")
 @click.option("--version")
 @click.option("--force", is_flag=True)
+@click.option("--license", is_flag=True)
 def submit_prov(dataset_dir: str,
                 activity_label: str,
                 activity_keywords: tuple[str],
                 prov_url: str,
                 version: Optional[str],
                 force: bool,
+                license: bool,
                 ):
 
     dataset = SeraphDataset(dataset_dir)
@@ -177,6 +196,9 @@ def submit_prov(dataset_dir: str,
 
     _submit_dataset(prov, prov_url)
     _submit_activity(prov, activity_label, list(activity_keywords), prov_url)
+
+    if license:
+        _submit_license(prov, prov_url)
 
 
 ###############################################################################

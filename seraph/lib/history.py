@@ -40,11 +40,12 @@ class ImportRecord:
     classes: Optional[list[str]] = None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChangeRecord:
     bump_type: VersionBumpType
     change_type: ChangeType
     message: str
+    is_import: bool = False
 
 
 @dataclass
@@ -80,6 +81,7 @@ def change_rec_factory(cur: sqlite3.Cursor, row: sqlite3.Row) -> ChangeRecord:
         bump_type=str_to_enum(row[0], VersionBumpType),
         change_type=str_to_enum(row[1], ChangeType),
         message=row[2],
+        is_import=int(row[3]) == 1,
     )
 
 
@@ -214,9 +216,9 @@ class HistoryManager:
             return
 
         data = [
-            (current_version, c.bump_type.value, c.change_type.value, c.message) for c in self.change_records
+            (current_version, c.bump_type.value, c.change_type.value, c.message, c.is_import) for c in self.change_records
         ]
-        query = "INSERT INTO modifications VALUES ( ?, ?, ?, ? )"
+        query = "INSERT INTO modifications VALUES ( ?, ?, ?, ?, ? )"
 
         con = sqlite3.connect(self.fq_change_filename)
 
@@ -259,7 +261,7 @@ class HistoryManager:
 
         # Changes
         cur.row_factory = change_rec_factory
-        cur.execute("SELECT bump_type, change_type, message FROM modifications WHERE current_version = ?", [version])
+        cur.execute("SELECT bump_type, change_type, message, is_import FROM modifications WHERE current_version = ?", [version])
         changes: list[ChangeRecord] = cur.fetchall()
 
         return imports, changes
@@ -277,12 +279,18 @@ class HistoryManager:
 
         with con:
             con.execute("CREATE TABLE IF NOT EXISTS components ( current_version, import_uri, import_version, import_classes )")
-            con.execute("CREATE TABLE IF NOT EXISTS modifications ( current_version, bump_type, change_type, message )")
+            con.execute("CREATE TABLE IF NOT EXISTS modifications ( current_version, bump_type, change_type, message, is_import )")
             con.execute("CREATE TABLE IF NOT EXISTS versions ( version, datetime, prov_submitted )")
 
             cur = con.execute("SELECT * FROM versions LIMIT 1")
             if cur.fetchone() is None:
                 cur.execute("INSERT INTO versions VALUES ( ?, ?, ? )", ["0.0.0", now(), True])
+
+            # TODO: Remove once everything is updated
+            try:
+                con.execute("ALTER TABLE modifications ADD COLUMN is_import")
+            except sqlite3.OperationalError:
+                print("Already upgraded")
         con.close()
 
         return fq_internal_dirname, fq_change_filename

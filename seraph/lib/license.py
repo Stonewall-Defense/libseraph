@@ -105,7 +105,7 @@ def _format_license_concerns(license: Optional[License]) -> str:
 ###############################################################################
 def load_license(license_id: str) -> Optional[License]:
     key = "url" if is_web_url(license_id) else "id"
-    raw_license = next((l for l in ALL_LICENSES if l[key] == license_id), None)
+    raw_license = next((license for license in ALL_LICENSES if license[key] == license_id), None)
 
     if raw_license:
         od_conformance = str_to_enum(raw_license["od_conformance"] or "not reviewed", LicenseConformance)

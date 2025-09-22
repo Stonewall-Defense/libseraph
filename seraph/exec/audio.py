@@ -467,7 +467,8 @@ def _import_audio_dataset(local_dataset: SeraphDataset,
     change = ChangeRecord(
         bump_type=VersionBumpType.MAJOR,
         change_type=ChangeType.ADD,
-        message=f"Added data from {remote_meta.uri} to dataset"
+        message=f"Added data from {remote_meta.uri} to dataset",
+        is_import=True,
     )
     import_rec = ImportRecord(
         uri=remote_meta.uri,
@@ -619,7 +620,7 @@ def _clip_audio_files(dataset: SeraphDataset,
         change = ChangeRecord(
             bump_type=VersionBumpType.MINOR,
             change_type=ChangeType.CHANGE,
-            message=f"Clipped audio to {clip_duration_secs:.02f} secs"
+            message=f"Clipped audio to {clip_duration_secs:.02f} secs",
         )
         dataset.set_metadata_headers(headers, change_record=change).set_metadata_records(clipped_metadata).save()
     else:
@@ -744,7 +745,7 @@ def audio_add_duration(dataset_dir: str,
     change = ChangeRecord(
         bump_type=VersionBumpType.MINOR,
         change_type=ChangeType.ADD,
-        message="Added or updated audio duration column"
+        message="Added or updated audio duration column",
     )
     dataset.set_metadata_headers(fieldnames, change_record=change).set_metadata_records(metadata).save()
 
@@ -797,7 +798,7 @@ def audio_resample(dataset_dir: str, target_sr: int):
     change = ChangeRecord(
         bump_type=VersionBumpType.MAJOR,
         change_type=ChangeType.CHANGE,
-        message=f"Resampled audio to {(target_sr/1000):.02f} KHz"
+        message=f"Resampled audio to {(target_sr/1000):.02f} KHz",
     )
     dataset.set_seraph_metadata(seraph, change_record=change).save()
 

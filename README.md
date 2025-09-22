@@ -56,7 +56,5 @@ conda deactivate
 
 - **IDEMPOTENCE**
   - Prevent a dataset from being "double-tapped"
-- Features
-  - Submit licenses
 - Pipe dreams
   - Undo

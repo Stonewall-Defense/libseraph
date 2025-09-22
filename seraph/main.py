@@ -8,6 +8,7 @@ import click
 ###############################################################################
 from .exec.audio import audio
 from .exec.classes import classes
+from .exec.integrations import integrations
 from .exec.meta import meta
 from .exec.provenance import prov
 from .exec.prune import prune
@@ -25,6 +26,7 @@ def cli():
 
 cli.add_command(audio)
 cli.add_command(classes)
+cli.add_command(integrations)
 cli.add_command(meta)
 cli.add_command(prov)
 cli.add_command(prune)
