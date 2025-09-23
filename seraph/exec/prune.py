@@ -147,15 +147,16 @@ def prune_rows(dataset_dir: str,
 
     if len(idx_to_remove):
         new_metadata_records = []
-        files_to_remove = set()
+        files_to_keep = set()
 
         for idx, record in enumerate(metadata_records):
             if idx not in idx_to_remove:
                 new_metadata_records.append(record)
+                files_to_keep.add(record["filename"])
             else:
-                files_to_remove.add(record["filename"])
+                pass
 
-        _remove_files(data_dir, set([]))
+        _remove_files(data_dir, files_to_keep)
 
         # Save data
         str_1 = f"had a value of {rm_row_val}" if rm_row_val else ""

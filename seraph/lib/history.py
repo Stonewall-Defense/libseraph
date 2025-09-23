@@ -302,7 +302,7 @@ class HistoryManager:
                 con.execute("ALTER TABLE components ADD COLUMN import_name")
                 con.execute("ALTER TABLE modifications ADD COLUMN is_import")
             except sqlite3.OperationalError:
-                print("Already upgraded")
+                pass
         con.close()
 
         return fq_internal_dirname, fq_change_filename

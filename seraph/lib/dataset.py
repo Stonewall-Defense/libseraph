@@ -118,6 +118,17 @@ def _load_seraph_file(fq_filename: str) -> SeraphMetadata:
 
 
 ###############################################################################
+# Functions
+###############################################################################
+def serialize_seraph(seraph: SeraphMetadata) -> dict[str, Any]:
+    ret = asdict(seraph)
+    ret["creationDate"] = seraph.creationDate.strftime("%Y-%m-%dT%H:%M:%SZ")
+    ret["mediaType"] = seraph.mediaType.value
+    ret["authors"] = [asdict(a) for a in seraph.authors]
+    return ret
+
+
+###############################################################################
 # Classes
 ###############################################################################
 class SeraphDataset:
@@ -279,9 +290,7 @@ class SeraphDataset:
             write_csv(self.fq_metadata_filename, self.fieldnames, self.metadata)
 
         if self.seraph_was_updated:
-            seraph_file_data = asdict(self.seraph_metadata)
-            seraph_file_data["creationDate"] = self.seraph_metadata.creationDate.strftime("%Y-%m-%dT%H:%M:%SZ")
-            seraph_file_data["mediaType"] = self.seraph_metadata.mediaType.value
+            seraph_file_data = serialize_seraph(self.seraph_metadata)
             write_json(self.fq_seraph_filename, seraph_file_data)
 
         if self.classes_were_updated:
