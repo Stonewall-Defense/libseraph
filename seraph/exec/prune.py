@@ -168,7 +168,7 @@ def prune_rows(dataset_dir: str,
             change_type=ChangeType.REMOVE,
             message=gov_str,
         )
-        dataset.set_metadata_records(metadata_records, change_record=change).save()
+        dataset.set_metadata_records(new_metadata_records, change_record=change).save()
 
 
 ###############################################################################

@@ -29,7 +29,7 @@ import torchaudio
 ###############################################################################
 from ..lib import REQUIRED_METADATA_FIELD_NAMES, REQUIRED_METADATA_IMPORT_COLS, VERIFY_OUTPUT_FORMATS
 from ..lib import str_to_enum, write_csv
-from ..lib import SeraphDataset, VersionBumpType, ChangeType, ChangeRecord, ImportRecord, SeraphMetadataError, VerifyOutputFormat
+from ..lib import SeraphDataset, VersionBumpType, ChangeType, ChangeRecord, ImportRecord, SeraphMetadataError, VerifyOutputFormat, SupportedMediaType
 
 
 ###############################################################################
@@ -361,7 +361,7 @@ def _import_audio_dataset(local_dataset: SeraphDataset,
         raise NotImplementedError("For now, media types must match between datasets")
     elif local_seraph.mediaSubtype != remote_seraph.mediaSubtype:
         raise NotImplementedError("For now, media subtypes must match between datasets")
-    elif local_seraph.mediaType != "audio" or local_seraph.mediaSubtype != "wav":
+    elif local_seraph.mediaType != SupportedMediaType.AUDIO or local_seraph.mediaSubtype != "wav":
         raise NotImplementedError("For now, only `audio/wav` datasets are supported")
 
     ####################

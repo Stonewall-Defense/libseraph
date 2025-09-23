@@ -156,10 +156,16 @@ def datapackage(dataset_path: str, output_filename: str):
     write_json(fq_output_filename, package)
 
 
-@integrations.command("fuelai")
+@integrations.group("fuelai")
+def fuelai():
+    pass
+
+
+@fuelai.command("export")
 @click.option("--dataset_path", default=".")
 @click.option("--force", is_flag=True)
-def fuelai(dataset_path: str, force: bool):
+@click.option("--drop_leading_underscore", is_flag=True)
+def fuelai_export(dataset_path: str, force: bool, drop_leading_underscore: bool):
     dataset = SeraphDataset(dataset_path)
     classes = dataset.get_classes()
 
@@ -167,12 +173,32 @@ def fuelai(dataset_path: str, force: bool):
     if mod_classes:
         mod_str = f"Classes {', '.join(mod_classes)} {'will' if force else 'would'} be modified during the export process"
         if force:
-            warnings.warn(mod_str)
+            warnings.warn(mod_str, stacklevel=2)
         else:
             raise ValueError(mod_str)
 
-    fuelai_classes = [{"name": re.sub(CLASS_NAME_REPLACE_PATTERN, "_", c)} for c in classes]
-    write_json("fuelai-classes.json", fuelai_classes)
+    classes_tmp = [re.sub(CLASS_NAME_REPLACE_PATTERN, "_", c) for c in classes]
+    if drop_leading_underscore:
+        classes_tmp = [re.sub(r'^_', "", c) for c in classes_tmp]
+
+    fuelai_classes = [{"name": c} for c in classes_tmp]
+
+    fq_output_filename = os.path.join(dataset_path, "fuelai-classes.json")
+    write_json(fq_output_filename, fuelai_classes)
+
+
+@fuelai.command("import")
+@click.option("--dataset_path", default=".")
+@click.option("--fuelai_metadata_file")
+@click.option("--sort_classes", is_flag=True)
+def fuelai_import(dataset_path: str, fuelai_metadata_file: str, sort_classes: bool):
+    try:
+        SeraphDataset.directory_is_seraph_dataset(dataset_path)
+        new_dataset = False
+    except ValueError:
+        new_dataset = True
+
+    print("[yellow]Sorry, this isn't implemented yet[/yellow]")
 
 
 ###############################################################################
