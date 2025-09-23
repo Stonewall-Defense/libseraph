@@ -37,6 +37,7 @@ class ChangeType(Enum):
 class ImportRecord:
     uri: str
     version: str
+    name: str
     classes: Optional[list[str]] = None
 
 
@@ -67,11 +68,12 @@ CHANGE_RECORD_FILENAME = "change_record.db"
 # Helpers
 ###############################################################################
 def import_rec_factory(cur: sqlite3.Cursor, row: sqlite3.Row) -> ImportRecord:
-    classes = row[2].split(";") if row[2] else None
+    classes = row[3].split(";") if row[3] else None
 
     return ImportRecord(
         uri=row[0],
         version=row[1],
+        name=row[2],
         classes=classes,
     )
 
@@ -208,6 +210,15 @@ class HistoryManager:
 
         return submitted
 
+    def load_sources(self) -> list[ImportRecord]:
+        con = sqlite3.connect(self.fq_change_filename)
+        with con:
+            cur = con.cursor()
+            cur.row_factory = import_rec_factory
+            cur.execute("SELECT import_uri, import_version, import_name, import_classes FROM components")
+            imports: list[ImportRecord] = cur.fetchall()
+            return imports
+
     ###########################################################################
     # Internal Writers
     ###########################################################################
@@ -233,9 +244,9 @@ class HistoryManager:
             return
 
         data = [
-            (current_version, i.uri, i.version, ";".join(i.classes) if i.classes else None) for i in self.import_records
+            (current_version, i.uri, i.version, i.name, ";".join(i.classes) if i.classes else None) for i in self.import_records
         ]
-        query = "INSERT INTO components VALUES ( ?, ?, ?, ? )"
+        query = "INSERT INTO components ( current_version, import_uri, import_version, import_name, import_classes ) VALUES ( ?, ?, ?, ?, ? )"
 
         con = sqlite3.connect(self.fq_change_filename)
 
@@ -256,7 +267,7 @@ class HistoryManager:
     def _load_changes_for_version(self, version: str, cur: sqlite3.Cursor):
         # Imports
         cur.row_factory = import_rec_factory
-        cur.execute("SELECT import_uri, import_version, import_classes FROM components WHERE current_version = ?", [version])
+        cur.execute("SELECT import_uri, import_version, import_name, import_classes FROM components WHERE current_version = ?", [version])
         imports: list[ImportRecord] = cur.fetchall()
 
         # Changes
@@ -278,7 +289,7 @@ class HistoryManager:
         con = sqlite3.connect(fq_change_filename)
 
         with con:
-            con.execute("CREATE TABLE IF NOT EXISTS components ( current_version, import_uri, import_version, import_classes )")
+            con.execute("CREATE TABLE IF NOT EXISTS components ( current_version, import_uri, import_version, import_name, import_classes )")
             con.execute("CREATE TABLE IF NOT EXISTS modifications ( current_version, bump_type, change_type, message, is_import )")
             con.execute("CREATE TABLE IF NOT EXISTS versions ( version, datetime, prov_submitted )")
 
@@ -288,6 +299,7 @@ class HistoryManager:
 
             # TODO: Remove once everything is updated
             try:
+                con.execute("ALTER TABLE components ADD COLUMN import_name")
                 con.execute("ALTER TABLE modifications ADD COLUMN is_import")
             except sqlite3.OperationalError:
                 print("Already upgraded")

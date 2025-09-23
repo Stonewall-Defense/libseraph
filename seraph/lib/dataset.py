@@ -18,6 +18,7 @@ from .common import get_metadata_filename, read_csv, write_csv, read_json, write
 
 from .author import DatasetAuthor, Organization, uri_to_identifier_schema
 from .history import HistoryManager, ChangeRecord, ImportRecord
+from .media_type import SupportedMediaType, check_media_type
 
 
 ###############################################################################
@@ -31,7 +32,7 @@ class SeraphMetadata:
     authors: list[DatasetAuthor]
     keywords: list[str]
     creationDate: datetime
-    mediaType: Optional[str]
+    mediaType: SupportedMediaType
     mediaSubtype: Optional[str]
     license: Optional[str]
 
@@ -99,10 +100,8 @@ def _load_seraph_file(fq_filename: str) -> SeraphMetadata:
         authors = [_load_author(author) for author in seraph["authors"]]
 
     media_type = seraph.get("mediaType", None)
-    if media_type and "/" in media_type:
-        media_type, media_subtype = media_type.split("/")
-    else:
-        media_subtype = seraph.get("mediaSubtype", None)
+    media_subtype = seraph.get("mediaSubtype", None)
+    media_type, media_subtype = check_media_type(media_type, media_subtype)
 
     return SeraphMetadata(
         uri=uri,
@@ -167,6 +166,15 @@ class SeraphDataset:
 
     def get_history(self):
         return self.history_manager
+
+    def get_metadata_filename(self):
+        return self.metadata_filename
+
+    def get_seraph_filename(self):
+        return SERAPH_FILENAME
+
+    def get_class_filename(self):
+        return CLASSFILE_NAME
 
     ###########################################################################
     # Setters

@@ -355,9 +355,7 @@ def _import_audio_dataset(local_dataset: SeraphDataset,
     # Media Subtypes
     # TODO: Support multiple media subtypes
     ####################
-    if not local_seraph.mediaType or not remote_seraph.mediaType:
-        raise NotImplementedError("For now, you need to submit a media type for both datasets")
-    elif not local_seraph.mediaSubtype or not remote_seraph.mediaSubtype:
+    if not local_seraph.mediaSubtype or not remote_seraph.mediaSubtype:
         raise NotImplementedError("For now, you need to submit a media subtype for both datasets")
     elif local_seraph.mediaType != remote_seraph.mediaType:
         raise NotImplementedError("For now, media types must match between datasets")
@@ -473,7 +471,8 @@ def _import_audio_dataset(local_dataset: SeraphDataset,
     import_rec = ImportRecord(
         uri=remote_meta.uri,
         version=remote_meta.version,
-        classes=imported_classes
+        name=remote_meta.name,
+        classes=imported_classes,
     )
 
     local_dataset.set_multiple(classes=new_class_list,

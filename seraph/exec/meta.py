@@ -5,6 +5,7 @@ from dataclasses import asdict
 from itertools import zip_longest
 import json
 import os
+from typing import Optional
 from uuid import uuid4
 
 ###############################################################################
@@ -24,7 +25,7 @@ from asaperson import orcid_to_person, isni_to_person, vcf_to_person
 ###############################################################################
 from ..lib import CLASSFILE_NAME, PREFERRED_METADATA_FILENAME, REQUIRED_METADATA_FIELD_NAMES, SERAPH_FILENAME, VERIFY_OUTPUT_FORMATS, VALID_MEDIA_TYPES, DEFAULT_AUTHOR_ROLE
 from ..lib import write_csv, write_json, get_user_input, str_to_enum, now, load_license, print_license_concerns, check_role_in_known_taxonomy, uri_to_identifier_schema, check_media_type
-from ..lib import HistoryManager, VerifyOutputFormat, SeraphDataset, ChangeRecord, VersionBumpType, ChangeType, DatasetAuthor, RoleTaxonomy
+from ..lib import HistoryManager, VerifyOutputFormat, SeraphDataset, ChangeRecord, VersionBumpType, ChangeType, DatasetAuthor, RoleTaxonomy, SupportedMediaType
 
 
 ###############################################################################
@@ -38,7 +39,7 @@ def _string_is_not_empty(arg: str) -> bool:
     return len(arg.strip()) > 0
 
 
-def _get_media_type_from_user():
+def _get_media_type_from_user() -> tuple[SupportedMediaType, Optional[str]]:
     media_type, media_subtype = None, None
 
     while True:
@@ -204,7 +205,7 @@ def meta_init(dataset_path: str, override: bool):
     }
 
     if media_type:
-        seraph_file_data["mediaType"] = media_type
+        seraph_file_data["mediaType"] = media_type.value
 
     if media_subtype:
         seraph_file_data["mediaSubtype"] = media_subtype

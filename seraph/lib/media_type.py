@@ -79,11 +79,11 @@ def check_media_type(media_type: str,
                      media_subtype: Optional[str] = None,
                      *,
                      allowed_media_type_trees: list[MediaTypeTree] = [MediaTypeTree.VND],
-                     ):
+                     ) -> tuple[SupportedMediaType, Optional[str]]:
     # Deal with possible subtype issues/configurations
     has_media_subtype = _has_media_subtype(media_type)
     if has_media_subtype and media_subtype:
-        raise ValueError("Cannot supply a media subtype in but the media type and separately")
+        raise ValueError("Cannot supply a media subtype in both the media type and separately")
     elif has_media_subtype:
         segs = media_type.split("/")
         if len(segs) != 2:
@@ -97,7 +97,7 @@ def check_media_type(media_type: str,
 
     # If no subtype, no need to verify
     if not media_subtype:
-        return media_type, media_subtype
+        return media_fmt, media_subtype
 
     # Lazy load
     if media_type not in _MEDIA_TYPE_SUBTYPE_MAP:
@@ -111,11 +111,11 @@ def check_media_type(media_type: str,
     segs = media_subtype.split(".")
     has_tree = len(segs) > 1
     if not has_tree:
-        return media_type, media_subtype
+        return media_fmt, media_subtype
 
     tree = segs[0]
     allowed = [t.value for t in allowed_media_type_trees]
     if tree not in allowed:
         raise ValueError(f"Subtype tree {tree} is not allowed, must in the standards tree or be one of {allowed}")
     else:
-        return media_type, media_subtype
+        return media_fmt, media_subtype
