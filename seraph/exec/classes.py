@@ -322,19 +322,22 @@ def merge_classes_regex(dataset_dir: str,
 
 @classes.command("drop")
 @click.option("--dataset_dir", default=".")
-@click.option("--class_name", required=True)
+@click.option("--class_name", multiple=True)
 @click.option("--sort_classes", default=True)
 def drop_class(dataset_dir: str,
-               class_name: str,
+               class_name: tuple[str],
                sort_classes: bool,
                ):
+    if not class_name:
+        raise ValueError("Must provide at least one class to drop")
+
     # Setup
     dataset = SeraphDataset(dataset_dir)
     _, metadata = dataset.get_metadata()
     class_list = dataset.get_classes()
 
     # Generate new metadata
-    new_class_list = [c for c in class_list if c != class_name]
+    new_class_list = [c for c in class_list if c not in class_name]
 
     if sort_classes:
         new_class_list.sort()
@@ -345,7 +348,7 @@ def drop_class(dataset_dir: str,
     for entry in metadata:
         entry_class_name = entry["class_name"]
 
-        if entry_class_name == class_name:
+        if entry_class_name not in new_class_list:
             continue
         else:
             entry_class_id = new_class_list.index(entry_class_name)
@@ -356,7 +359,7 @@ def drop_class(dataset_dir: str,
             filtered_metadata.append(entry)
 
     # Save everything
-    gov_str = f"Dropped class {class_name}"
+    gov_str = f"Dropped class {class_name}" if len(class_name) == 1 else f"Dropped classes {', '.join(class_name)}"
 
     change = ChangeRecord(
         bump_type=VersionBumpType.MAJOR,
