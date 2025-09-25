@@ -88,6 +88,7 @@ def _preprocess_split_data(metadata: list[dict[str, str]],
                            len_col_name: Optional[str],
                            identity_col_name: str,
                            shuffle_segments: bool,
+                           incoherent: bool,
                            ):
     ret: dict[int, list[SplitEntry]] = {}
 
@@ -101,8 +102,8 @@ def _preprocess_split_data(metadata: list[dict[str, str]],
         ret.setdefault(class_id, [])
         idx = next((i for i, item in enumerate(ret[class_id]) if item.id == entry[identity_col_name]), None)
 
-        # No match so add a new record
-        if idx is None:
+        # No match so add a new record OR we're not doing clips
+        if idx is None or incoherent:
             ret[class_id].append(SplitEntry(id=entry[identity_col_name], data_count=data_count, clips=[entry]))
         # Match, so append to existing record
         else:
@@ -196,12 +197,14 @@ def splits():
 @click.option("--len_col_name")
 @click.option("--random_seed", type=int)
 @click.option("--shuffle_segments", default=True)
+@click.option("--incoherent", is_flag=True)
 def train_test_splits(split_type: str,
                       dataset_dir: str,
                       identity_col_name: str,
                       len_col_name: Optional[str],
                       random_seed: Optional[int],
                       shuffle_segments: bool,
+                      incoherent: bool,
                       ):
     split_choice = str_to_enum(split_type, SplitChoice)
 
@@ -219,7 +222,7 @@ def train_test_splits(split_type: str,
     if random_seed is not None:
         random.seed(random_seed)
 
-    preproc = _preprocess_split_data(metadata, len_col_name, identity_col_name, shuffle_segments)
+    preproc = _preprocess_split_data(metadata, len_col_name, identity_col_name, shuffle_segments, incoherent)
     ttv_params, n_folds, have_validation_split = _make_ttv_split_params(split_choice)
 
     folded_metadata = []
@@ -248,6 +251,7 @@ def train_test_splits(split_type: str,
 @click.option("--random_seed", type=int)
 @click.option("--shuffle_segments", default=True)
 @click.option("--shuffle_folds", default=True)
+@click.option("--incoherent", is_flag=True)
 def fold_splits(n_folds: int,
                 dataset_dir: str,
                 identity_col_name: str,
@@ -255,6 +259,7 @@ def fold_splits(n_folds: int,
                 random_seed: Optional[int],
                 shuffle_segments: bool,
                 shuffle_folds: bool,
+                incoherent: bool,
                 ):
     if n_folds < 2 or n_folds > 100:
         raise ValueError(f"Number of folds must be in range 2-100 but is {n_folds}")
@@ -273,7 +278,7 @@ def fold_splits(n_folds: int,
     if random_seed is not None:
         random.seed(random_seed)
 
-    preproc = _preprocess_split_data(metadata, len_col_name, identity_col_name, shuffle_segments)
+    preproc = _preprocess_split_data(metadata, len_col_name, identity_col_name, shuffle_segments, incoherent)
 
     folded_metadata = []
     for cls_records in tqdm(preproc.values(), "Folding classes"):

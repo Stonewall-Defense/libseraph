@@ -23,7 +23,14 @@ from ..lib import read_csv, write_csv, write_json, get_user_input, get_metadata_
 ###############################################################################
 # Helpers
 ###############################################################################
-def _ratio_color(siz: int, max_siz: int):
+def _init_class_map(class_list: list[str]) -> dict[str, float]:
+    mapped_class_totals = {}
+    for cls in class_list:
+        mapped_class_totals[cls] = 0
+    return mapped_class_totals
+
+
+def _ratio_color(siz: float, max_siz: float):
     ratio = siz / max_siz
 
     if ratio > 1 / 2:
@@ -40,25 +47,29 @@ def _pprint_ratio(val: float):
     return f"1/{denom}"
 
 
-def _pprint_class_balance(class_list: list[str], mapped_class_totals: dict[str, int]):
+def _pprint_class_balance(class_list: list[str], mapped_class_totals: dict[str, float], split_name: Optional[str]):
     max_siz = max(mapped_class_totals.values())
     min_siz = min(mapped_class_totals.values())
 
     max_bal = min_siz / max_siz
     max_bal_color = _ratio_color(min_siz, max_siz)
 
+    split_title = f"for split {split_name} " if split_name else ""
+    title = f"Class Balance {split_title}(overall [{max_bal_color}]{_pprint_ratio(max_bal)}[/{max_bal_color}])"
+
     table = Table(
+        "Class ID",
         "Class Name",
         Column("Data Size", justify="right"),
         Column("Class Ratio", justify="right"),
-        title=f"Class Balances (overall [{max_bal_color}]{_pprint_ratio(max_bal)}[/{max_bal_color}])"
+        title=title,
     )
 
-    for cls in class_list:
+    for class_id, cls in enumerate(class_list):
         siz = mapped_class_totals[cls]
         bal = siz / max_siz
         bal_color = _ratio_color(siz, max_siz)
-        table.add_row(cls, str(int(siz)), f"[{bal_color}]{_pprint_ratio(bal)}[/{bal_color}]")
+        table.add_row(str(class_id), cls, str(int(siz)), f"[{bal_color}]{_pprint_ratio(bal)}[/{bal_color}]")
     print(table)
 
 
@@ -362,23 +373,39 @@ def drop_class(dataset_dir: str,
 @classes.command("check-balance")
 @click.option("--dataset_dir", default=".")
 @click.option("--len_col_name")
-def classes_check_balance(dataset_dir: str, len_col_name: Optional[str]):
+@click.option("--split_col_name")
+def classes_check_balance(dataset_dir: str, len_col_name: Optional[str], split_col_name: Optional[str]):
     # Setup
     dataset = SeraphDataset(dataset_dir)
     _, metadata = dataset.get_metadata()
     class_list = dataset.get_classes()
 
-    mapped_class_totals = {}
-    for cls in class_list:
-        mapped_class_totals[cls] = 0
+    results: list[tuple[Optional[str], dict[str, float]]] = []
 
-    for record in metadata:
-        cls = record["class_name"]
-        siz = record[len_col_name] if len_col_name else 1
-        siz = siz or 1
-        mapped_class_totals[cls] += float(siz)
+    if split_col_name:
+        tmp: dict[str, dict[str, float]] = {}
+        for record in metadata:
+            cls = record["class_name"]
+            split = record[split_col_name]
+            siz = record[len_col_name] if len_col_name else 1
+            siz = siz or 1
 
-    _pprint_class_balance(class_list, mapped_class_totals)
+            tmp.setdefault(split, _init_class_map(class_list))
+            tmp[split][cls] += float(siz)
+        for key, value in tmp.items():
+            results.append((key, value))
+    else:
+        mapped_class_totals = _init_class_map(class_list)
+
+        for record in metadata:
+            cls = record["class_name"]
+            siz = record[len_col_name] if len_col_name else 1
+            siz = siz or 1
+            mapped_class_totals[cls] += float(siz)
+        results.append((None, mapped_class_totals))
+
+    for name, result in results:
+        _pprint_class_balance(class_list, result, name)
 
 
 @classes.command("compose")
