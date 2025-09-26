@@ -3,8 +3,6 @@
 ###############################################################################
 from dataclasses import asdict
 from itertools import zip_longest
-import json
-import os
 from typing import Optional
 from uuid import uuid4
 
@@ -23,8 +21,8 @@ from asaperson import orcid_to_person, isni_to_person, vcf_to_person
 ###############################################################################
 # Local Imports
 ###############################################################################
-from ..lib import CLASSFILE_NAME, PREFERRED_METADATA_FILENAME, REQUIRED_METADATA_FIELD_NAMES, SERAPH_FILENAME, VERIFY_OUTPUT_FORMATS, VALID_MEDIA_TYPES, DEFAULT_AUTHOR_ROLE
-from ..lib import write_csv, write_json, get_user_input, str_to_enum, now, load_license, print_license_concerns, check_role_in_known_taxonomy, uri_to_identifier_schema, check_media_type
+from ..lib import REQUIRED_METADATA_FIELD_NAMES, VERIFY_OUTPUT_FORMATS, VALID_MEDIA_TYPES, DEFAULT_AUTHOR_ROLE
+from ..lib import write_csv, get_user_input, str_to_enum, now, load_license, print_license_concerns, check_role_in_known_taxonomy, uri_to_identifier_schema, check_media_type, derive_dataset
 from ..lib import HistoryManager, VerifyOutputFormat, SeraphDataset, ChangeRecord, VersionBumpType, ChangeType, DatasetAuthor, RoleTaxonomy, SupportedMediaType
 
 
@@ -214,26 +212,19 @@ def meta_init(dataset_path: str, override: bool):
         seraph_file_data["license"] = license
 
     # Write the file itself
-    fq_seraph_filename = os.path.join(dataset_path, SERAPH_FILENAME)
-    with open(fq_seraph_filename, "x") as outfile:
-        outfile.write(json.dumps(seraph_file_data, indent=2))
-
-    # Empty `classes.json` file
-    fq_class_filename = os.path.join(dataset_path, CLASSFILE_NAME)
-    if os.path.isfile(fq_class_filename) and not override:
-        raise RuntimeError("Class file already exists")
-    else:
-        write_json(fq_class_filename, [])
-
-    # Placeholder `metadata.csv` file
-    fq_metadata_filename = os.path.join(dataset_path, PREFERRED_METADATA_FILENAME)
-    if os.path.isfile(fq_metadata_filename) and not override:
-        raise RuntimeError("Metadata file already exists")
-    else:
-        write_csv(fq_metadata_filename, REQUIRED_METADATA_FIELD_NAMES, [])
+    SeraphDataset.create(dataset_path, seraph_file_data, override)
 
     # Ensure necessary dirs exists
     HistoryManager.initialize(dataset_path)
+
+
+@meta.command("derive")
+@click.option("--dataset_path", default=".")
+@click.option("--parent_dataset", required=True)
+@click.option("--uri", required=True)
+def meta_derive(dataset_path: str, parent_dataset: str, uri: str):
+    parent = SeraphDataset(parent_dataset)
+    derive_dataset(parent, dataset_path, uri)
 
 
 @meta.command("verify")

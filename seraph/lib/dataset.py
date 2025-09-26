@@ -4,8 +4,10 @@
 from copy import deepcopy
 from dataclasses import dataclass, asdict
 from datetime import datetime
+import json
 import os
 import pathlib
+import shutil
 from typing import Any, Optional
 import warnings
 
@@ -13,8 +15,8 @@ import warnings
 ###############################################################################
 # Local Imports
 ###############################################################################
-from .common import ALLOWED_METADATA_FILENAMES, CLASSFILE_NAME, DATA_DIR, SERAPH_FILENAME
-from .common import get_metadata_filename, read_csv, write_csv, read_json, write_json, parse_iso_date
+from .common import ALLOWED_METADATA_FILENAMES, CLASSFILE_NAME, DATA_DIR, SERAPH_FILENAME, PREFERRED_METADATA_FILENAME, REQUIRED_METADATA_FIELD_NAMES
+from .common import get_metadata_filename, read_csv, write_csv, read_json, write_json, parse_iso_date, format_iso_date
 
 from .author import DatasetAuthor, Organization, uri_to_identifier_schema
 from .history import HistoryManager, ChangeRecord, ImportRecord
@@ -35,6 +37,8 @@ class SeraphMetadata:
     mediaType: SupportedMediaType
     mediaSubtype: Optional[str]
     license: Optional[str]
+
+    viewOf: Optional[str]
 
     # mediaMetadata -> [mediaType] -> [mediaSubtype] -> key:value
     mediaMetadata: Optional[dict[str, dict[str, Any]]]
@@ -113,16 +117,16 @@ def _load_seraph_file(fq_filename: str) -> SeraphMetadata:
         mediaType=media_type,
         mediaSubtype=media_subtype,
         license=seraph.get("license", None),
+
+        viewOf=seraph.get("viewOf", None),
+
         mediaMetadata=seraph.get("mediaMetadata", None),
     )
 
 
-###############################################################################
-# Functions
-###############################################################################
-def serialize_seraph(seraph: SeraphMetadata) -> dict[str, Any]:
+def _serialize_seraph(seraph: SeraphMetadata) -> dict[str, Any]:
     ret = asdict(seraph)
-    ret["creationDate"] = seraph.creationDate.strftime("%Y-%m-%dT%H:%M:%SZ")
+    ret["creationDate"] = format_iso_date(seraph.creationDate)
     ret["mediaType"] = seraph.mediaType.value
     ret["authors"] = [asdict(a) for a in seraph.authors]
     return ret
@@ -290,7 +294,7 @@ class SeraphDataset:
             write_csv(self.fq_metadata_filename, self.fieldnames, self.metadata)
 
         if self.seraph_was_updated:
-            seraph_file_data = serialize_seraph(self.seraph_metadata)
+            seraph_file_data = _serialize_seraph(self.seraph_metadata)
             write_json(self.fq_seraph_filename, seraph_file_data)
 
         if self.classes_were_updated:
@@ -334,3 +338,48 @@ class SeraphDataset:
         pathlib.Path(fq_data_dirname).mkdir(parents=True, exist_ok=True)
 
         return fq_data_dirname, HistoryManager(dataset_path)
+
+    @staticmethod
+    def create(dataset_path: str, seraph_raw: dict[str, Any], override: bool):
+        fq_seraph_filename = os.path.join(dataset_path, SERAPH_FILENAME)
+        with open(fq_seraph_filename, "x") as outfile:
+            outfile.write(json.dumps(seraph_raw, indent=2))
+
+        # Empty `classes.json` file
+        fq_class_filename = os.path.join(dataset_path, CLASSFILE_NAME)
+        if os.path.isfile(fq_class_filename) and not override:
+            raise RuntimeError("Class file already exists")
+        else:
+            write_json(fq_class_filename, [])
+
+        # Placeholder `metadata.csv` file
+        fq_metadata_filename = os.path.join(dataset_path, PREFERRED_METADATA_FILENAME)
+        if os.path.isfile(fq_metadata_filename) and not override:
+            raise RuntimeError("Metadata file already exists")
+        else:
+            write_csv(fq_metadata_filename, REQUIRED_METADATA_FIELD_NAMES, [])
+
+
+###############################################################################
+# Functions
+###############################################################################
+def derive_dataset(parent: SeraphDataset, target_dir: str, uri: str):
+    seraph = parent.get_seraph_metadata()
+    classes = parent.fq_class_filename
+    meta = parent.fq_metadata_filename
+
+    seraph.viewOf = seraph.uri + seraph.version
+    seraph.uri = uri
+    seraph.version = "v0.1.0"
+
+    fq_seraph_filename = os.path.join(target_dir, SERAPH_FILENAME)
+    serial = _serialize_seraph(seraph)
+    write_json(fq_seraph_filename, serial)
+
+    fq_class_filename = os.path.join(target_dir, CLASSFILE_NAME)
+    shutil.copyfile(classes, fq_class_filename)
+
+    fq_metadata_filename = os.path.join(target_dir, PREFERRED_METADATA_FILENAME)
+    shutil.copyfile(meta, fq_metadata_filename)
+
+    HistoryManager.initialize(target_dir)

@@ -121,7 +121,11 @@ def get_user_input(prompt: str,
 
 
 def now():
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(timezone.utc)
+
+
+def now_str():
+    return format_iso_date(now())
 
 
 def today():
@@ -130,6 +134,10 @@ def today():
 
 def parse_iso_date(date_string: str):
     return datetime.strptime(date_string, "%Y-%m-%dT%H:%M:%SZ")
+
+
+def format_iso_date(dt: datetime):
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def is_web_url(val: str) -> bool:

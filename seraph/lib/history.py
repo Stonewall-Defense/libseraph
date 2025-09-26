@@ -11,7 +11,7 @@ from typing import Optional
 ###############################################################################
 # Local Imports
 ###############################################################################
-from .common import SERAPH_INTERNAL_DIR, now, str_to_enum
+from .common import SERAPH_INTERNAL_DIR, now_str, str_to_enum
 
 
 ###############################################################################
@@ -150,7 +150,7 @@ class HistoryManager:
 
         with con:
             query = "INSERT INTO versions VALUES ( ?, ?, ? )"
-            con.execute(query, [next_version, now(), False])
+            con.execute(query, [next_version, now_str(), False])
         con.close()
 
     def mark_prov_submission(self, version: Optional[str] = None):
@@ -295,7 +295,7 @@ class HistoryManager:
 
             cur = con.execute("SELECT * FROM versions LIMIT 1")
             if cur.fetchone() is None:
-                cur.execute("INSERT INTO versions VALUES ( ?, ?, ? )", ["0.0.0", now(), True])
+                cur.execute("INSERT INTO versions VALUES ( ?, ?, ? )", ["0.0.0", now_str(), True])
 
             # TODO: Remove once everything is updated
             try:

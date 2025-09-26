@@ -17,7 +17,7 @@ from rich import print
 ###############################################################################
 # Local Imports
 ###############################################################################
-from ..lib import SeraphDataset, SeraphMetadata, ChangeRecord, ImportRecord, now, load_license
+from ..lib import SeraphDataset, SeraphMetadata, ChangeRecord, ImportRecord, now_str, load_license
 
 
 ###############################################################################
@@ -147,7 +147,7 @@ def show_prov(dataset_dir: str, version: Optional[str]):
     dataset = SeraphDataset(dataset_dir)
     prov = _preprocess_prov(dataset, version)
 
-    title = f"[bold][white]{prov.seraph.name} provenance updates for v{prov.prov_version} as of {now()}[/white] "
+    title = f"[bold][white]{prov.seraph.name} provenance updates for v{prov.prov_version} as of {now_str()}[/white] "
     if prov.prov_was_submitted:
         title += "[green](SUBMITTED)[/green]"
     else:

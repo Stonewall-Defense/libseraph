@@ -16,7 +16,7 @@ from rich import print
 ###############################################################################
 # Local Imports
 ###############################################################################
-from ..lib import SeraphDataset, write_json, load_license, is_web_url
+from ..lib import SeraphDataset, write_json, load_license, is_web_url, format_iso_date
 
 
 ###############################################################################
@@ -79,7 +79,7 @@ def datapackage(dataset_path: str, output_filename: str):
         "id": seraph_meta.uri,
         "name": seraph_meta.name,
         "version": seraph_meta.version,
-        "created": seraph_meta.creationDate.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "created": format_iso_date(seraph_meta.creationDate),
         "$schema": "https://datapackage.org/profiles/2.0/datapackage.json",
     }
 
