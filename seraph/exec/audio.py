@@ -659,20 +659,20 @@ def _fmt_col(val: str | bool | None | int):
 ###############################################################################
 # ! Commands
 ###############################################################################
-@click.group("audio")
+@click.group("audio", help="Commands for importing, modifying, and pruning audio data")
 def audio():
     pass
 
 
-@audio.command("import")
-@click.option("--import_dir", required=True)
-@click.option("--metadata_field_merge_strat", default="append", type=click.Choice(METADATA_FIELD_MERGE_STRATEGIES))
-@click.option("--media_subtype_merge_strat", default="reject", type=click.Choice(AUDIO_BASE_MERGE_STRATEGIES))
-@click.option("--channel_merge_strat", default="reject", type=click.Choice(AUDIO_MIX_MERGE_STRATEGIES))
-@click.option("--sample_rate_merge_strat", default="reject", type=click.Choice(AUDIO_MIX_MERGE_STRATEGIES))
-@click.option("--subtype_value_merge_strat", default="reject", type=click.Choice(AUDIO_BASE_MERGE_STRATEGIES))
-@click.option("--class_select", multiple=True)
-@click.option("--class_exclude", multiple=True)
+@audio.command("import", help="Import audio data from an external Seraph dataset")
+@click.option("--import_dir", required=True, help="The directory from which to import data")
+@click.option("--metadata_field_merge_strat", default="append", type=click.Choice(METADATA_FIELD_MERGE_STRATEGIES), help="What should be done with unmatched metadata columns?")
+@click.option("--media_subtype_merge_strat", default="reject", type=click.Choice(AUDIO_BASE_MERGE_STRATEGIES), help="What should be done if the audio subtypes differ between datasets?")
+@click.option("--channel_merge_strat", default="reject", type=click.Choice(AUDIO_MIX_MERGE_STRATEGIES), help="What should be done if the number of audio channels differ between datasets?")
+@click.option("--sample_rate_merge_strat", default="reject", type=click.Choice(AUDIO_MIX_MERGE_STRATEGIES), help="What should be done if the sample rate of audio files differ between datasets?")
+@click.option("--subtype_value_merge_strat", default="reject", type=click.Choice(AUDIO_BASE_MERGE_STRATEGIES), help="What should be done if misc subtype values differ between datasets?")
+@click.option("--class_select", multiple=True, help="One or more classes to cherry-pick from the remote dataset")
+@click.option("--class_exclude", multiple=True, help="One or more classes from the remote dataset to exclude")
 def audio_import(import_dir: str,
                  metadata_field_merge_strat: str,
                  media_subtype_merge_strat: str,
