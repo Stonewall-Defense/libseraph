@@ -16,7 +16,7 @@ from rich import print
 ###############################################################################
 # Local Imports
 ###############################################################################
-from ..lib import SeraphDataset, write_json, load_license, is_web_url, format_iso_date
+from ..lib import SeraphDataset, ChangeRecord, VersionBumpType, ChangeType, write_json, load_license, is_web_url, format_iso_date, read_json
 
 
 ###############################################################################
@@ -34,7 +34,7 @@ def integrations():
 
 
 # See https://datatracker.ietf.org/doc/html/rfc8493
-@integrations.command("bagit")
+@integrations.command("bagit", help="https://datatracker.ietf.org/doc/html/rfc8493")
 @click.option("--dataset_path", default=".")
 @click.option("--namaste", is_flag=True)
 def bagit(dataset_path: str, namaste: bool):
@@ -67,10 +67,15 @@ def bagit(dataset_path: str, namaste: bool):
     bag_and_tag(dataset_path, metadata=bag_meta, other_tag_files=seraph_tagfiles, write_namaste=namaste)
 
 
-@integrations.command("datapackage")
+@integrations.group("datapackage", help="https://datapackage.org/standard/data-package/")
+def datapackage():
+    pass
+
+
+@datapackage.command("export")
 @click.option("--dataset_path", default=".")
 @click.option("--output_filename", default="datapackage.json")
-def datapackage(dataset_path: str, output_filename: str):
+def datapackage_export(dataset_path: str, output_filename: str):
     dataset = SeraphDataset(dataset_path)
     seraph_meta = dataset.get_seraph_metadata()
 
@@ -156,6 +161,67 @@ def datapackage(dataset_path: str, output_filename: str):
     write_json(fq_output_filename, package)
 
 
+@click.option("--dataset_path", default=".")
+@click.option("--input_filename", default="datapackage.json")
+@datapackage.command("import")
+def datapackage_import(dataset_path: str, input_filename: str):
+    try:
+        SeraphDataset.directory_is_seraph_dataset(dataset_path)
+        print(f"[red]Directory {dataset_path} is already a Seraph dataset and will not be overwritten")
+        sys.exit(1)
+    except ValueError:
+        pass
+
+    print("[yellow]Sorry, this isn't implemented yet[/yellow]")
+
+
+@integrations.group("rocrate", help="https://www.researchobject.org/ro-crate/specification/1.2/index.html")
+def rocrate():
+    pass
+
+
+@rocrate.command("export")
+@click.option("--dataset_path", default=".")
+@click.option("--preview", is_flag=True)
+def rocrate_export(dataset_path: str, preview: bool):
+    try:
+        from rocrate.rocrate import ROCrate
+        from rocrate.model.person import Person
+    except ImportError:
+        print("[red]For RO-Crate integration `seraph` relies on the `rocrate` library, which is not installed[/red]")
+        sys.exit(1)
+
+    dataset = SeraphDataset(dataset_path)
+
+    crate = ROCrate(gen_preview=preview)
+    crate.add_file(dataset.get_seraph_filename(), properties={
+        "name": "Seraph File",
+        "encodingFormat": "application/json",
+    })
+    crate.add_file(dataset.get_metadata_filename(), properties={
+        "name": "Metadata File",
+        "encodingFormat": "text/csv",
+    })
+    crate.add_file(dataset.get_class_filename(), properties={
+        "name": "Class List File",
+        "encodingFormat": "application/json",
+    })
+
+    seraph = dataset.get_seraph_metadata()
+
+    crate.name = seraph.name
+    crate.license = seraph.license
+
+    for a in seraph.authors:
+        crate.add(Person(crate, a.uri, properties={
+            "name": a.name,
+        }))
+
+    crate.add_dataset(dataset.get_data_dir())
+
+    crate.write(dataset_path)
+
+
 @integrations.group("fuelai", help="https://fuelai.lotl.app/")
 def fuelai():
     pass
@@ -191,14 +257,36 @@ def fuelai_export(dataset_path: str, force: bool, drop_leading_underscore: bool)
 @click.option("--dataset_path", default=".")
 @click.option("--fuelai_metadata_file", required=True)
 @click.option("--sort_classes", is_flag=True)
-def fuelai_import(dataset_path: str, fuelai_metadata_file: str, sort_classes: bool):
+@click.option("--force", is_flag=True)
+def fuelai_import(dataset_path: str, fuelai_metadata_file: str, sort_classes: bool, force: bool):
     try:
         SeraphDataset.directory_is_seraph_dataset(dataset_path)
         new_dataset = False
     except ValueError:
         new_dataset = True
 
-    print("[yellow]Sorry, this isn't implemented yet[/yellow]")
+    if new_dataset:
+        print("[yellow]Sorry, this isn't implemented yet[/yellow]")
+    else:
+        dataset = SeraphDataset(dataset_path)
+        classes = dataset.get_classes()
+        if len(classes) > 0 and not force:
+            print("[yellow]Dataset already has classes listed; to append to existing class list, retry with `--force` flag[/yellow]")
+            return
+        else:
+            fuelai_raw = read_json(fuelai_metadata_file)
+            fuel_ai_classes = [c["name"] for c in fuelai_raw]
+            classes += fuel_ai_classes
+
+            if sort_classes:
+                classes.sort()
+
+            change = ChangeRecord(
+                bump_type=VersionBumpType.MAJOR,
+                change_type=ChangeType.ADD,
+                message=f"Added {len(fuel_ai_classes)} from FuelAI metadata file"
+            )
+            dataset.set_classes(classes, change_record=change).save()
 
 
 ###############################################################################
