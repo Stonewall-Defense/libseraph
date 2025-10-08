@@ -545,7 +545,7 @@ def _clip_audio_files(dataset: SeraphDataset,
     files_to_clip: list[FileToClip] = []
 
     for record in metadata_records:
-        original_duration = float(record["duration_secs"])
+        original_duration = float(record[duration_col_name])
 
         duration = original_duration
         original_filename = record["filename"]
@@ -563,7 +563,7 @@ def _clip_audio_files(dataset: SeraphDataset,
 
             # Update metadata records
             clip_meta = deepcopy(record)
-            clip_meta["duration_secs"] = str(clip_duration_secs)
+            clip_meta[duration_col_name] = str(clip_duration_secs)
             clip_meta["filename"] = clip_filename
             clip_meta["file_id"] = original_filename
             clip_meta["clip_id"] = str(clip_id)
@@ -585,14 +585,14 @@ def _clip_audio_files(dataset: SeraphDataset,
         have_clips = len(clip_record.clips) > 0
 
         if end_strat == ClipEndStrategy.EXTEND and have_clips:
-            clipped_metadata[-1]["duration_secs"] = clip_duration_secs + duration
+            clipped_metadata[-1][duration_col_name] = clip_duration_secs + duration
             clip_record.clips[-1].end_secs += duration
         elif end_strat == ClipEndStrategy.PARTIAL or not have_clips:  # Possible TODO: Clean up this path
             clip_filename = f"{filename_root}-{clip_id}.{ext}"
 
             # Update metadata records
             clip_meta = deepcopy(record)
-            clip_meta["duration_secs"] = str(duration)
+            clip_meta[duration_col_name] = str(duration)
             clip_meta["filename"] = clip_filename
             clip_meta["file_id"] = original_filename
             clip_meta["clip_id"] = str(clip_id)

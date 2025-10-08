@@ -177,7 +177,7 @@ def _make_ttv_split_params(split_choice: SplitChoice):
     n_test_folds = int((test_pct / 100) * n_folds)
     n_validation_folds = int((val_pct / 100) * n_folds)
 
-    folds_ids = (["train"] * n_train_folds) + (["test"] * n_test_folds) + (["validate"] * n_validation_folds)
+    folds_ids = (["train"] * n_train_folds) + (["test"] * n_test_folds) + (["val"] * n_validation_folds)
     random.shuffle(folds_ids)
     return folds_ids, n_folds, have_validataion_split
 

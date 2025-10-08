@@ -1,9 +1,9 @@
 ###############################################################################
 # Global Imports
 ###############################################################################
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 
 ###############################################################################
@@ -48,6 +48,11 @@ class DatasetAuthor:
     identifierScheme: Optional[str]
     email: Optional[str]
     affiliations: Optional[list[Organization]]
+
+    def serialize(self) -> dict[str, Any]:
+        ret = asdict(self)
+        ret["affiliations"] = [asdict(a) for a in self.affiliations] if self.affiliations else None
+        return ret
 
 
 ###############################################################################

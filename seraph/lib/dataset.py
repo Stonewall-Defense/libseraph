@@ -65,6 +65,9 @@ def _load_org(val: dict[str, Any]):
 
 
 def _load_author(val: dict[str, Any]):
+    affiliations_raw = val.get("affiliations", None)
+    affiliations = [_load_org(org) for org in affiliations_raw] if affiliations_raw else None
+
     return DatasetAuthor(
         uri=val["uri"],
         name=val["name"],
@@ -75,7 +78,7 @@ def _load_author(val: dict[str, Any]):
         familyName=val.get("familyName", None),
         identifierScheme=uri_to_identifier_schema(val["uri"]),
         email=val.get("email", None),
-        affiliations=[_load_org(org) for org in val.get("affiliations", [])],
+        affiliations=affiliations,
     )
 
 
@@ -98,10 +101,10 @@ def _load_seraph_file(fq_filename: str) -> SeraphMetadata:
             affiliations=None,
         )]
     elif seraph.get("authors", None):
+        authors = [_load_author(author) for author in seraph["authors"]]
+    else:
         warnings.warn(f"Dataset {uri} has no authors. This will fail to load in future versions.", DeprecationWarning)
         authors = []
-    else:
-        authors = [_load_author(author) for author in seraph["authors"]]
 
     media_type = seraph.get("mediaType", None)
     media_subtype = seraph.get("mediaSubtype", None)
@@ -124,11 +127,16 @@ def _load_seraph_file(fq_filename: str) -> SeraphMetadata:
     )
 
 
-def _serialize_seraph(seraph: SeraphMetadata) -> dict[str, Any]:
-    ret = asdict(seraph)
-    ret["creationDate"] = format_iso_date(seraph.creationDate)
-    ret["mediaType"] = seraph.mediaType.value
-    ret["authors"] = [asdict(a) for a in seraph.authors]
+def _serialize_seraph(seraph: SeraphMetadata | dict[str, Any]) -> dict[str, Any]:
+    if isinstance(seraph, SeraphMetadata):
+        ret = asdict(seraph)
+        ret["creationDate"] = format_iso_date(seraph.creationDate)
+        ret["mediaType"] = seraph.mediaType.value
+        ret["authors"] = [a.serialize() for a in seraph.authors]
+    else:
+        ret = deepcopy(seraph)
+        ret["creationDate"] = format_iso_date(ret["creationDate"])
+
     return ret
 
 
@@ -341,9 +349,10 @@ class SeraphDataset:
 
     @staticmethod
     def create(dataset_path: str, seraph_raw: dict[str, Any], override: bool):
+        seraph = _serialize_seraph(seraph_raw)
         fq_seraph_filename = os.path.join(dataset_path, SERAPH_FILENAME)
         with open(fq_seraph_filename, "x") as outfile:
-            outfile.write(json.dumps(seraph_raw, indent=2))
+            outfile.write(json.dumps(seraph, indent=2))
 
         # Empty `classes.json` file
         fq_class_filename = os.path.join(dataset_path, CLASSFILE_NAME)
