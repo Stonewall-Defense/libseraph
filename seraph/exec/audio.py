@@ -118,25 +118,39 @@ DURATION_COL_DEFAULT_NAME = "duration_secs"
 ###############################################################################
 # Helpers
 ###############################################################################
-def _prune_remote_data_by_classes(remote_dataset: SeraphDataset,
-                                  class_select: Optional[list[str]],
-                                  class_exclude: Optional[list[str]],
-                                  ):
+def _prune_remote_data(remote_dataset: SeraphDataset,
+                       class_select: Optional[list[str]],
+                       class_exclude: Optional[list[str]],
+                       min_length_secs: Optional[int],
+                       duration_col_name: Optional[str],
+                       ):
     # Nothing to be done, so bail out
-    if not class_select and not class_exclude:
+    if not class_select and not class_exclude and not min_length_secs:
         return
 
-    # These are mutually exclusive
+    # Class Selection
     if class_select:
-        select_fn = lambda cls: (cls in class_select)       # noqa
+        cls_select_fn = lambda rec: ((rec["class_name"] if isinstance(rec, dict) else rec) in class_select)         # noqa
+    elif class_exclude:
+        cls_select_fn = lambda rec: ((rec["class_name"] if isinstance(rec, dict) else rec) not in class_exclude)    # noqa
     else:
-        select_fn = lambda cls: (cls not in class_exclude)  # noqa
+        cls_select_fn = lambda _: True                                      # noqa
 
     classes = remote_dataset.get_classes()
     _, metadata_records = remote_dataset.get_metadata()
 
-    new_classes = [c for c in classes if select_fn(c)]
-    new_metadata = [m for m in metadata_records if select_fn(m["class_name"])]
+    new_classes = [c for c in classes if cls_select_fn(c)]
+
+    # Set up other selection criteria for metadata only
+    if min_length_secs and duration_col_name:
+        dur_select_fn = lambda rec: (float(rec[duration_col_name]) >= min_length_secs) # noqa
+    else:
+        dur_select_fn = lambda _: True                                          # noqa
+
+    select_fns = [cls_select_fn, dur_select_fn]
+
+    # Down-select
+    new_metadata = [m for m in metadata_records if all([s(m) for s in select_fns])]
 
     remote_dataset.set_classes(new_classes).set_metadata_records(new_metadata)
     return new_classes
@@ -335,6 +349,8 @@ def _import_audio_dataset(local_dataset: SeraphDataset,
                           subtype_value_merge_strat: AudioBaseMergeStrategy,
                           class_select: Optional[list[str]],
                           class_exclude: Optional[list[str]],
+                          min_length_secs: Optional[int],
+                          duration_col_name: Optional[str],
                           ):
     ####################
     # Get local and remote metadata
@@ -443,7 +459,7 @@ def _import_audio_dataset(local_dataset: SeraphDataset,
     ####################
     # Actually import the data
     ####################
-    imported_classes = _prune_remote_data_by_classes(remote_dataset, class_select, class_exclude)
+    imported_classes = _prune_remote_data(remote_dataset, class_select, class_exclude, min_length_secs, duration_col_name)
 
     new_class_list, remote_class_mapping = _merge_classes(local_dataset, remote_dataset)
     fieldnames, local_meta_records, remote_meta_records = _merge_metadata(local_dataset, remote_dataset, metadata_field_merge_strat, new_class_list, remote_class_mapping)
@@ -673,6 +689,8 @@ def audio():
 @click.option("--subtype_value_merge_strat", default="reject", type=click.Choice(AUDIO_BASE_MERGE_STRATEGIES), help="What should be done if misc subtype values differ between datasets?")
 @click.option("--class_select", multiple=True, help="One or more classes to cherry-pick from the remote dataset")
 @click.option("--class_exclude", multiple=True, help="One or more classes from the remote dataset to exclude")
+@click.option("--min_length_secs", type=int)
+@click.option("--duration_col_name", default=DURATION_COL_DEFAULT_NAME, help="This parameter has no effect if `min_length_secs` is not set")
 def audio_import(import_dir: str,
                  metadata_field_merge_strat: str,
                  media_subtype_merge_strat: str,
@@ -681,6 +699,8 @@ def audio_import(import_dir: str,
                  subtype_value_merge_strat: str,
                  class_select: tuple[str],
                  class_exclude: tuple[str],
+                 min_length_secs: Optional[int],
+                 duration_col_name: str,
                  ):
     local_dataset = SeraphDataset(".")
     remote_dataset = SeraphDataset(import_dir)
@@ -693,6 +713,8 @@ def audio_import(import_dir: str,
 
     if class_select and class_exclude:
         raise ValueError("You cannot exclude and cherry-pick classes at the same time")
+    elif min_length_secs is not None and min_length_secs < 1:
+        raise ValueError("Paramater `min_length_secs` must be a positive integer if specified")
 
     _import_audio_dataset(local_dataset,
                           remote_dataset,
@@ -703,6 +725,8 @@ def audio_import(import_dir: str,
                           subtype_value_merge_strat_fmt,
                           list(class_select) if class_select else None,
                           list(class_exclude) if class_exclude else None,
+                          min_length_secs,
+                          duration_col_name if min_length_secs else None,
                           )
 
 
