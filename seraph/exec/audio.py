@@ -908,6 +908,7 @@ def audio_prune(dataset_dir: str, remove_zero_len: bool, remove_silence: bool):
 
     if not remove_zero_len and not remove_silence:
         print("[red]You must specify at least one removal parameter: `remove_zero_len`, `remove_silence`[/red]")
+        sys.exit(1)
 
     new_metadata_records = []
 

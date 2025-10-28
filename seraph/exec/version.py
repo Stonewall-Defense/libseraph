@@ -126,33 +126,31 @@ def _format_release(next_version: str,
                     ):
     ret = io.StringIO()
 
-    ret.write(f"## {next_version} - {today()}\n\n")
+    ret.write(f"## {next_version} - {today()}\n")
 
     if notice:
-        ret.write(f"_{notice}_\n\n")
+        ret.write(f"\n_{notice}_\n")
 
     changes_add = [c for c in change_list if c.change_type == ChangeType.ADD]
     if len(changes_add):
-        ret.write("### Added\n\n")
+        ret.write("\n### Added\n\n")
         for change in changes_add:
             prefix = BREAKING_CHANGELOG_PREFIX if change.bump_type == VersionBumpType.MAJOR else ""
             ret.write(f"- {prefix}{change.message}\n")
 
     changes_change = [c for c in change_list if c.change_type == ChangeType.CHANGE]
     if len(changes_change):
-        ret.write("### Changed\n\n")
+        ret.write("\n### Changed\n\n")
         for change in changes_change:
             prefix = BREAKING_CHANGELOG_PREFIX if change.bump_type == VersionBumpType.MAJOR else ""
             ret.write(f"- {prefix}{change.message}\n")
 
     changes_remove = [c for c in change_list if c.change_type == ChangeType.REMOVE]
     if len(changes_remove):
-        ret.write("### Removed\n\n")
+        ret.write("\n### Removed\n\n")
         for change in changes_remove:
             prefix = BREAKING_CHANGELOG_PREFIX if change.bump_type == VersionBumpType.MAJOR else ""
             ret.write(f"- {prefix}{change.message}\n")
-
-    ret.write("\n")
 
     return ret.getvalue()
 
