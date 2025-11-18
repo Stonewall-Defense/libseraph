@@ -368,6 +368,9 @@ class SeraphDataset:
         else:
             write_csv(fq_metadata_filename, REQUIRED_METADATA_FIELD_NAMES, [])
 
+        fq_data_dir = os.path.join(dataset_path, DATA_DIR)
+        os.makedirs(fq_data_dir, exist_ok=True)
+
 
 ###############################################################################
 # Functions
