@@ -172,6 +172,42 @@ def prune_rows(dataset_dir: str,
         dataset.set_metadata_records(new_metadata_records, change_record=change).save()
 
 
+@prune.command("dupes")
+@click.option("--dataset_dir", default=".")
+@click.option("--identity_column", required=True)
+def prune_dupes(dataset_dir: str, identity_column: str):
+    dataset = SeraphDataset(dataset_dir)
+    data_dir = dataset.get_data_dir()
+    _, metadata_records = dataset.get_metadata()
+
+    ids_seen = set()
+    new_metadata_records = []
+    files_to_keep = set()
+
+    records_removed = 0
+
+    for record in metadata_records:
+        id = record[identity_column]
+        filename = record["filename"]
+
+        if id not in ids_seen:
+            ids_seen.add(id)
+            new_metadata_records.append(record)
+            files_to_keep.add(filename)
+        else:
+            records_removed += 1
+
+    _ = _remove_files(data_dir, files_to_keep, False)
+
+    if records_removed:
+        change = ChangeRecord(
+            bump_type=VersionBumpType.PATCH,
+            change_type=ChangeType.REMOVE,
+            message=f"Pruned {records_removed} duplicate metadata entries",
+        )
+        dataset.set_metadata_records(new_metadata_records, change_record=change).save()
+
+
 ###############################################################################
 # ! Main
 ###############################################################################
