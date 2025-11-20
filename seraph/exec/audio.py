@@ -796,7 +796,7 @@ def audio_clip_files(clip_duration_secs: float,
 
 @audio.command("resample")
 @click.option("--dataset_dir", default=".")
-@click.option("--target_sr", type=int)
+@click.option("--target_sr", type=int, required=True)
 def audio_resample(dataset_dir: str, target_sr: int):
     dataset = SeraphDataset(dataset_dir)
 
