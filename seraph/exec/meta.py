@@ -271,7 +271,7 @@ def meta_verify(dataset_path: str, output_format: str):
             print(table)
 
 
-@meta.command("dataum-id")
+@meta.command("datum-id")
 @click.option("--dataset_path", default=".")
 @click.option("--datum_col_name", default="datum_id")
 @click.option("--start_from_1", is_flag=True)

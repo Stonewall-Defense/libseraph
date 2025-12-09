@@ -147,7 +147,10 @@ def show_prov(dataset_dir: str, version: Optional[str]):
     dataset = SeraphDataset(dataset_dir)
     prov = _preprocess_prov(dataset, version)
 
-    title = f"[bold][white]{prov.seraph.name} provenance updates for v{prov.prov_version} as of {now_str()}[/white] "
+    version = prov.prov_version
+    prefix = "" if version.startswith("v") else "v"
+
+    title = f"[bold][white]{prov.seraph.name} provenance updates for {prefix}{version} as of {now_str()}[/white] "
     if prov.prov_was_submitted:
         title += "[green](SUBMITTED)[/green]"
     else:

@@ -359,7 +359,7 @@ def drop_class(dataset_dir: str,
             filtered_metadata.append(entry)
 
     # Save everything
-    gov_str = f"Dropped class {class_name}" if len(class_name) == 1 else f"Dropped classes {', '.join(class_name)}"
+    gov_str = f"Dropped class {class_name[0]}" if len(class_name) == 1 else f"Dropped classes {', '.join(class_name)}"
 
     change = ChangeRecord(
         bump_type=VersionBumpType.MAJOR,
