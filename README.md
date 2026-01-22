@@ -52,6 +52,13 @@ seraph version show
 conda deactivate
 ```
 
+## Testing
+
+```bash
+python3 -m coverage run -m unittest discover -s test -p "*_test.py" && python -m coverage report --skip-covered
+python -m coverage html
+```
+
 ## TODO
 
 - **IDEMPOTENCE**
