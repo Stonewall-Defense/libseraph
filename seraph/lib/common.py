@@ -104,10 +104,10 @@ def str_to_enum(arg: str, target_enum: type[T]) -> T:
 
 
 def get_user_input(prompt: str,
-              *,
-              valid_fn: Optional[Callable[[str], bool]] = None,
-              err_prompt="Invalid input",
-              ) -> str | None:
+                   *,
+                   valid_fn: Optional[Callable[[str], bool]] = None,
+                   err_prompt="Invalid input",
+                   ) -> str | None:
     while True:
         user_input = input(prompt)
         is_valid = True

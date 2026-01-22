@@ -93,7 +93,7 @@ def prune_records(dataset_dir: str, dry_run: bool):
 
 @prune.command("column")
 @click.option("--dataset_dir", default=".")
-@click.option("--column_name", multiple=True)
+@click.option("--column_name", multiple=True, required=True)
 def prune_column(dataset_dir: str, column_name: tuple[str]):
     dataset = SeraphDataset(dataset_dir)
     headers, metadata_records = dataset.get_metadata()
