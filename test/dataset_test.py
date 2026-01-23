@@ -8,7 +8,7 @@ import tempfile
 ###############################################################################
 # Helper Imports
 ###############################################################################
-from seraph.lib.common import CLASSFILE_NAME, SERAPH_FILENAME, PREFERRED_METADATA_FILENAME, DATA_DIR, SERAPH_INTERNAL_DIR
+from seraph.lib.common import CLASSFILE_NAME, SERAPH_FILENAME, PREFERRED_METADATA_FILENAME, DATA_DIR
 from seraph.lib.history import HistoryManager
 from _config import TEST_DATASET_BETA, SERAPH_FILE_CONTENTS
 

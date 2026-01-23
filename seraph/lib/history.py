@@ -115,15 +115,23 @@ class HistoryManager:
         if change:
             self.change_records.append(change)
 
+        return self
+
     def register_import(self, import_rec: Optional[ImportRecord]):
         if import_rec:
             self.import_records.append(import_rec)
 
+        return self
+
     def register_changes(self, changes: list[ChangeRecord]):
         self.change_records += changes
 
+        return self
+
     def register_imports(self, import_recs: list[ImportRecord]):
         self.import_records += import_recs
+
+        return self
 
     def register(self,
                  *,
@@ -133,6 +141,8 @@ class HistoryManager:
         self.register_change(change)
         self.register_import(import_rec)
 
+        return self
+
     def register_all(self,
                      *,
                      changes: list[ChangeRecord] = [],
@@ -140,6 +150,8 @@ class HistoryManager:
                      ):
         self.register_changes(changes)
         self.register_imports(import_recs)
+
+        return self
 
     def save(self, current_version: str):
         self._save_change_records(current_version)
@@ -153,6 +165,8 @@ class HistoryManager:
             con.execute(query, [next_version, now_str(), False])
         con.close()
 
+        return self
+
     def mark_prov_submission(self, version: Optional[str] = None):
         con = sqlite3.connect(self.fq_change_filename)
 
@@ -164,10 +178,12 @@ class HistoryManager:
             con.execute(query, [version])
         con.close()
 
+        return self
+
     ###########################################################################
     # Read
     ###########################################################################
-    def load_changes(self, version: Optional[str]) -> tuple[list[ImportRecord], list[ChangeRecord]]:
+    def load_changes(self, version: Optional[str] = None) -> tuple[list[ImportRecord], list[ChangeRecord]]:
         con = sqlite3.connect(self.fq_change_filename)
 
         with con:
@@ -175,7 +191,7 @@ class HistoryManager:
             version = version or self._get_latest_version(cur)
             return self._load_changes_for_version(version, cur)
 
-    def load_change_list(self, versions: Optional[list[str]]):
+    def load_change_list(self, versions: Optional[list[str]] = None):
         con = sqlite3.connect(self.fq_change_filename)
         with con:
             cur = con.cursor()
@@ -260,7 +276,7 @@ class HistoryManager:
     # Internal Readers
     ###########################################################################
     def _get_latest_version(self, cur: sqlite3.Cursor):
-        cur = cur.execute("SELECT version FROM versions ORDER BY datetime DESC limit 1")
+        cur = cur.execute("SELECT version, datetime FROM versions ORDER BY datetime, version DESC LIMIT 1")
         version: str = cur.fetchone()[0]
         return version
 
