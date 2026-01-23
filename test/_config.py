@@ -1,3 +1,12 @@
+###############################################################################
+# Global Imports
+###############################################################################
+from typing import Optional
+
+
+###############################################################################
+# Constants
+###############################################################################
 TEST_DATASET_ALPHA = "test/res/component_alpha"
 TEST_DATASET_BETA = "test/res/component_beta"
 
@@ -32,3 +41,19 @@ SERAPH_FILE_CONTENTS = {
     "mediaSubtype": "wav",
     "license": "https://opensource.org/licenses/MIT",
 }
+
+
+###############################################################################
+# Utility Classes
+###############################################################################
+class MockInput:
+    # See https://dnmtechs.com/mocking-user-input-for-unit-testing-in-python-3/
+
+    def __init__(self, values: list[str]):
+        self.values = values
+        self.index = 0
+
+    def __call__(self, prompt: Optional[str] = None):
+        value = self.values[self.index]
+        self.index += 1
+        return value

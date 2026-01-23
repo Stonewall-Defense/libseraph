@@ -6,7 +6,6 @@ import tempfile
 ###############################################################################
 # Helper Imports
 ###############################################################################
-from seraph.lib.common import now_str
 from seraph.lib.dataset import SeraphDataset
 from _config import TEST_DATASET_BETA, SERAPH_FILE_CONTENTS
 

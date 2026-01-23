@@ -22,7 +22,7 @@ from asaperson import orcid_to_person, isni_to_person, vcf_to_person
 # Local Imports
 ###############################################################################
 from ..lib import REQUIRED_METADATA_FIELD_NAMES, VERIFY_OUTPUT_FORMATS, VALID_MEDIA_TYPES, DEFAULT_AUTHOR_ROLE
-from ..lib import write_csv, get_user_input, str_to_enum, now, load_license, print_license_concerns, check_role_in_known_taxonomy, uri_to_identifier_schema, check_media_type, derive_dataset
+from ..lib import write_csv, write_json, get_user_input, str_to_enum, now, load_license, print_license_concerns, check_role_in_known_taxonomy, uri_to_identifier_schema, check_media_type, derive_dataset
 from ..lib import HistoryManager, VerifyOutputFormat, SeraphDataset, ChangeRecord, VersionBumpType, ChangeType, DatasetAuthor, RoleTaxonomy, SupportedMediaType
 
 
@@ -260,6 +260,8 @@ def meta_verify(dataset_path: str, output_format: str):
             write_csv("metadata-verification-errors.csv",
                       COLUMNS,
                       [{"missing_headers": m, "dupe_headers": d} for m, d in zip_longest(missing_headers, dupe_headers)])
+        elif fmt == VerifyOutputFormat.JSON:
+            write_json("metadata-verification-errors.json", {"missing_headers": missing_headers, "dupe_headers": dupe_headers})
         else:
             table = Table(
                 *COLUMNS,

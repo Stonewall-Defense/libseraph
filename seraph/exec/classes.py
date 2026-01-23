@@ -118,6 +118,7 @@ def switch_classes(dataset_dir: str,
     new_classes = list(set([entry[new_class_col] for entry in metadata]))
     if sort_classes:
         new_classes.sort()
+    print(new_classes)
 
     for entry in metadata:
         new_class_name = entry[new_class_col]
@@ -165,9 +166,7 @@ def rename_classes(dataset_dir: str,
     fields, metadata = dataset.get_metadata()
     class_list = dataset.get_classes()
 
-    if not len(metadata):
-        raise NotImplementedError("For now, there must be metadata in the file to execute this operation")
-    elif new_class_name in class_list:
+    if new_class_name in class_list:
         raise ValueError(f"Target class {new_class_name} is already a class in this dataset; use merge instead")
     elif old_class_name not in class_list:
         raise ValueError(f"Class {old_class_name} is not a current class")
@@ -215,9 +214,7 @@ def merge_classes(dataset_dir: str,
     class_list = dataset.get_classes()
 
     # Sanity checks
-    if not len(metadata):
-        raise NotImplementedError("For now, there must be metadata in the file to execute this operation")
-    elif not len(classes_to_merge):
+    if not len(classes_to_merge):
         raise ValueError("Must specify at least one class to merge")
 
     # Generate new metadata
@@ -275,9 +272,7 @@ def merge_classes_regex(dataset_dir: str,
     class_merge_regex = get_user_input("Class merge regex: ")
 
     # Sanity checks
-    if not len(metadata):
-        raise NotImplementedError("For now, there must be metadata in the file to execute this operation")
-    elif class_merge_regex is None or not len(class_merge_regex):
+    if class_merge_regex is None or not len(class_merge_regex):
         raise ValueError("Must specify a regex to capture classes")
 
     pattern = re.compile(class_merge_regex)
@@ -338,6 +333,8 @@ def drop_class(dataset_dir: str,
 
     # Generate new metadata
     new_class_list = [c for c in class_list if c not in class_name]
+    if len(new_class_list) == 0:
+        raise ValueError("You cannot drop every class from a classification dataset!")
 
     if sort_classes:
         new_class_list.sort()

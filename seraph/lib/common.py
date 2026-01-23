@@ -34,6 +34,7 @@ class EnumArgumentError(Exception):
 class VerifyOutputFormat(Enum):
     PRINT = "print"
     CSV = "csv"
+    JSON = "json"
 
 
 VERIFY_OUTPUT_FORMATS = [val.value for val in VerifyOutputFormat]
