@@ -297,12 +297,6 @@ class HistoryManager:
             if cur.fetchone() is None:
                 cur.execute("INSERT INTO versions VALUES ( ?, ?, ? )", ["0.0.0", now_str(), True])
 
-            # TODO: Remove once everything is updated
-            try:
-                con.execute("ALTER TABLE components ADD COLUMN import_name")
-                con.execute("ALTER TABLE modifications ADD COLUMN is_import")
-            except sqlite3.OperationalError:
-                pass
         con.close()
 
         return fq_internal_dirname, fq_change_filename
