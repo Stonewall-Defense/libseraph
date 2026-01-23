@@ -61,8 +61,6 @@ python -m coverage html
 
 ### Tests to Write
 
-- lib
-  - history
 - exec
   - audio
   - classes
