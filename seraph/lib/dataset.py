@@ -387,7 +387,7 @@ def derive_dataset(parent: SeraphDataset, target_dir: str, uri: str):
     classes = parent.fq_class_filename
     meta = parent.fq_metadata_filename
 
-    seraph.viewOf = seraph.uri + seraph.version
+    seraph.viewOf = f"{seraph.uri}:{seraph.version}"
     seraph.uri = uri
     seraph.version = "v0.1.0"
 

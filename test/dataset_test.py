@@ -8,8 +8,9 @@ import tempfile
 ###############################################################################
 # Helper Imports
 ###############################################################################
+from seraph.lib.common import CLASSFILE_NAME, SERAPH_FILENAME, PREFERRED_METADATA_FILENAME, DATA_DIR, SERAPH_INTERNAL_DIR
 from seraph.lib.history import HistoryManager
-from _config import TEST_DATASET_BETA
+from _config import TEST_DATASET_BETA, SERAPH_FILE_CONTENTS
 
 ###############################################################################
 # Test Imports
@@ -17,36 +18,6 @@ from _config import TEST_DATASET_BETA
 import unittest
 
 from seraph.lib.dataset import SeraphDataset, derive_dataset, _serialize_seraph
-from seraph.lib.dataset import CLASSFILE_NAME, SERAPH_FILENAME, PREFERRED_METADATA_FILENAME, DATA_DIR
-
-
-###############################################################################
-# Helpers
-###############################################################################
-_EXAMPLE_FILE_CONTENTS = {
-    "uri": "tag:certusinnovations.com,2024:datasets:ExampleFileContents",
-    "version": "v0.0.0",
-    "name": "Example File Contents",
-    "authors": [
-        {
-            "uri": "tag:certusinnovations.com,2024:agents:RyanQuinn",
-            "name": "Ryan Quinn",
-            "roles": [
-                "associatedWith"
-            ],
-            "givenName": None,
-            "familyName": None,
-            "identifierScheme": "tag",
-            "email": None,
-            "affiliations": None
-        }
-    ],
-    "keywords": [],
-    "creationDate": "2026-01-23T13:27:00Z",
-    "mediaType": "audio",
-    "mediaSubtype": "wav",
-    "license": "https://opensource.org/licenses/MIT",
-}
 
 
 ###############################################################################
@@ -56,7 +27,7 @@ class TestDatasetMethods(unittest.TestCase):
     def setUp(self):
         self.tmp_dir = tempfile.TemporaryDirectory()
         self.dataset_path = self.tmp_dir.name
-        SeraphDataset.create(self.dataset_path, _EXAMPLE_FILE_CONTENTS, False)
+        SeraphDataset.create(self.dataset_path, SERAPH_FILE_CONTENTS, False)
 
     def tearDown(self) -> None:
         self.tmp_dir.cleanup()
@@ -88,7 +59,7 @@ class TestDatasetMethods(unittest.TestCase):
 
         seraph_meta = dataset.get_seraph_metadata()
         meta_tmp = _serialize_seraph(seraph_meta)
-        for key, value in _EXAMPLE_FILE_CONTENTS.items():
+        for key, value in SERAPH_FILE_CONTENTS.items():
             self.assertEqual(meta_tmp[key], value)
 
     def test_get_file_contents(self):
@@ -143,3 +114,31 @@ class TestDatasetMethods(unittest.TestCase):
         self.assertEqual(len(records_2), 11)
         self.assertEqual(classes_2, ["6.5 Creedmoor", "9x19", "5.56 NATO"])
         self.assertEqual(seraph_2.license, "BSD-2-Clause")
+
+    def test_derive_dataset(self):
+        os.unlink(os.path.join(self.dataset_path, SERAPH_FILENAME))
+        os.unlink(os.path.join(self.dataset_path, CLASSFILE_NAME))
+        os.unlink(os.path.join(self.dataset_path, PREFERRED_METADATA_FILENAME))
+        shutil.rmtree(os.path.join(self.dataset_path, DATA_DIR))
+
+        parent = SeraphDataset(TEST_DATASET_BETA)
+        headers, records = parent.get_metadata()
+        classes = parent.get_classes()
+        seraph = parent.get_seraph_metadata()
+
+        derive_dataset(parent, self.dataset_path, "tag:certusinnovations.com,2024:datasets:Derived")
+
+        child = SeraphDataset(self.dataset_path)
+        headers_2, records_2 = child.get_metadata()
+        classes_2 = child.get_classes()
+        seraph_2 = child.get_seraph_metadata()
+
+        self.assertEqual(headers, headers_2)
+        self.assertEqual(records, records_2)
+        self.assertEqual(classes, classes_2)
+
+        self.assertEqual(f"{seraph.uri}:{seraph.version}", seraph_2.viewOf)
+        self.assertEqual(seraph_2.version, "v0.1.0")
+        self.assertEqual(seraph_2.uri, "tag:certusinnovations.com,2024:datasets:Derived")
+
+        self.assertEqual(len(os.listdir(child.get_data_dir())), 0)

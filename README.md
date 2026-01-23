@@ -59,6 +59,20 @@ python3 -m coverage run -m unittest discover -s test -p "*_test.py" && python -m
 python -m coverage html
 ```
 
+### Tests to Write
+
+- lib
+  - history
+- exec
+  - audio
+  - classes
+  - integrations
+  - meta
+  - provenance
+  - prune
+  - splits
+  - version
+
 ## TODO
 
 - **IDEMPOTENCE**
