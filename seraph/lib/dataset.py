@@ -16,7 +16,7 @@ import warnings
 # Local Imports
 ###############################################################################
 from .common import ALLOWED_METADATA_FILENAMES, CLASSFILE_NAME, DATA_DIR, SERAPH_FILENAME, PREFERRED_METADATA_FILENAME, REQUIRED_METADATA_FIELD_NAMES
-from .common import get_metadata_filename, read_csv, write_csv, read_json, write_json, parse_iso_date, format_iso_date
+from .common import get_metadata_filename, read_csv, write_csv, read_json, write_json, parse_iso_date, format_iso_date, now_str
 
 from .author import DatasetAuthor, Organization, uri_to_identifier_schema
 from .history import HistoryManager, ChangeRecord, ImportRecord
@@ -135,7 +135,14 @@ def _serialize_seraph(seraph: SeraphMetadata | dict[str, Any]) -> dict[str, Any]
         ret["authors"] = [a.serialize() for a in seraph.authors]
     else:
         ret = deepcopy(seraph)
-        ret["creationDate"] = format_iso_date(ret["creationDate"])
+
+        c_date = ret["creationDate"]
+        if c_date is None:
+            ret["creationDate"] = now_str()
+        elif isinstance(c_date, datetime):
+            ret["creationDate"] = format_iso_date(ret["creationDate"])
+        else:   # Already a string, hopefully!
+            pass
 
     return ret
 

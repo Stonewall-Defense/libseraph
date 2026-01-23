@@ -173,9 +173,5 @@ pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python
 
-seraph.json
-*classes*.json
-*meta*.csv
-
 # namaste
 [0-4]=*

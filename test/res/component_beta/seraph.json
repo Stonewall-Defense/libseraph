@@ -1,0 +1,34 @@
+{
+  "uri": "tag:certusinnovations.com,2024:datasets:ComponentBeta",
+  "version": "v0.0.0",
+  "name": "Component Dataset Beta",
+  "authors": [
+    {
+      "uri": "tag:certusinnovations.com,2024:agents:RyanQuinn",
+      "name": "Ryan Quinn",
+      "roles": [
+        "associatedWith"
+      ],
+      "givenName": null,
+      "familyName": null,
+      "identifierScheme": "tag",
+      "email": null,
+      "affiliations": null
+    }
+  ],
+  "keywords": [],
+  "creationDate": "2026-01-23T13:28:00Z",
+  "mediaType": "audio",
+  "mediaSubtype": "wav",
+  "license": "https://opensource.org/licenses/MIT",
+  "mediaMetadata": {
+    "audio": {
+      "wav": {
+          "sampleRate": 48000,
+          "numChannels": 1,
+          "encoding": "PCM_S",
+          "bitsPerSample": 16
+      }
+    }
+  }
+}
