@@ -236,8 +236,9 @@ def version_list(dataset_dir: str, versions: tuple[str]):
     print(f"[bold][white]Version history for dataset {seraph.name} as of {today()}[/white][/bold]\n")
 
     for record in records:
-        prov_str = "[green]WAS[/greed]" if record.prov_was_submitted else "[red]NOT[/red]"
-        print(f"\n[purple]Changes recorded for v{record.version} ({record.datetime})[/purple][white](PROVENANCE {prov_str} SUBMITTED)[/white]")
+        prov_str = "[green]WAS[/green]" if record.prov_was_submitted else "[red]NOT[/red]"
+        prefix = "v" if record.version[0] != "v" else ""
+        print(f"\n[purple]Changes recorded for {prefix}{record.version} ({record.datetime})[/purple][white](PROVENANCE {prov_str} SUBMITTED)[/white]")
         if not record.changes:
             print("\n[yellow]No changes recorded for this version[/yellow]")
             continue

@@ -35,16 +35,16 @@ def integrations():
 
 # See https://datatracker.ietf.org/doc/html/rfc8493
 @integrations.command("bagit", help="https://datatracker.ietf.org/doc/html/rfc8493")
-@click.option("--dataset_path", default=".")
+@click.option("--dataset_dir", default=".")
 @click.option("--namaste", is_flag=True)
-def bagit(dataset_path: str, namaste: bool):
+def bagit(dataset_dir: str, namaste: bool):
     try:
         from FreezeTag import bag_and_tag
     except ImportError:
         print("[red]For BagIt integration `seraph` relies on the FreezeTag library, which is not installed[/red]")
         sys.exit(1)
 
-    dataset = SeraphDataset(dataset_path)
+    dataset = SeraphDataset(dataset_dir)
 
     # TODO: Org details, `External-Description`
     seraph_meta = dataset.get_seraph_metadata()
@@ -64,7 +64,7 @@ def bagit(dataset_path: str, namaste: bool):
         dataset.get_seraph_filename(),
     ]
 
-    bag_and_tag(dataset_path, metadata=bag_meta, other_tag_files=seraph_tagfiles, write_namaste=namaste)
+    bag_and_tag(dataset_dir, metadata=bag_meta, other_tag_files=seraph_tagfiles, write_namaste=namaste)
 
 
 @integrations.group("datapackage", help="https://datapackage.org/standard/data-package/")
@@ -73,10 +73,10 @@ def datapackage():
 
 
 @datapackage.command("export")
-@click.option("--dataset_path", default=".")
+@click.option("--dataset_dir", default=".")
 @click.option("--output_filename", default="datapackage.json")
-def datapackage_export(dataset_path: str, output_filename: str):
-    dataset = SeraphDataset(dataset_path)
+def datapackage_export(dataset_dir: str, output_filename: str):
+    dataset = SeraphDataset(dataset_dir)
     seraph_meta = dataset.get_seraph_metadata()
 
     # Core metadata
@@ -157,17 +157,17 @@ def datapackage_export(dataset_path: str, output_filename: str):
         "encoding": "utf-8",
     }]
 
-    fq_output_filename = os.path.join(dataset_path, output_filename)
+    fq_output_filename = os.path.join(dataset_dir, output_filename)
     write_json(fq_output_filename, package)
 
 
-@click.option("--dataset_path", default=".")
+@click.option("--dataset_dir", default=".")
 @click.option("--input_filename", default="datapackage.json")
 @datapackage.command("import")
-def datapackage_import(dataset_path: str, input_filename: str):
+def datapackage_import(dataset_dir: str, input_filename: str):
     try:
-        SeraphDataset.directory_is_seraph_dataset(dataset_path)
-        print(f"[red]Directory {dataset_path} is already a Seraph dataset and will not be overwritten")
+        SeraphDataset.directory_is_seraph_dataset(dataset_dir)
+        print(f"[red]Directory {dataset_dir} is already a Seraph dataset and will not be overwritten")
         sys.exit(1)
     except ValueError:
         pass
@@ -181,9 +181,9 @@ def rocrate():
 
 
 @rocrate.command("export")
-@click.option("--dataset_path", default=".")
+@click.option("--dataset_dir", default=".")
 @click.option("--preview", is_flag=True)
-def rocrate_export(dataset_path: str, preview: bool):
+def rocrate_export(dataset_dir: str, preview: bool):
     try:
         from rocrate.rocrate import ROCrate
         from rocrate.model.person import Person
@@ -191,7 +191,7 @@ def rocrate_export(dataset_path: str, preview: bool):
         print("[red]For RO-Crate integration `seraph` relies on the `rocrate` library, which is not installed[/red]")
         sys.exit(1)
 
-    dataset = SeraphDataset(dataset_path)
+    dataset = SeraphDataset(dataset_dir)
 
     crate = ROCrate(gen_preview=preview)
     crate.add_file(dataset.get_seraph_filename(), properties={
@@ -219,7 +219,7 @@ def rocrate_export(dataset_path: str, preview: bool):
 
     crate.add_dataset(dataset.get_data_dir())
 
-    crate.write(dataset_path)
+    crate.write(dataset_dir)
 
 
 @integrations.group("fuelai", help="https://fuelai.lotl.app/")
@@ -228,11 +228,11 @@ def fuelai():
 
 
 @fuelai.command("export", help="Export Seaph `classes.json` file to FuelAI format")
-@click.option("--dataset_path", default=".", help="Root DIR of the Seraph dataset to export")
+@click.option("--dataset_dir", default=".", help="Root DIR of the Seraph dataset to export")
 @click.option("--force", is_flag=True, help="Replace non-word characters with `_` IAW FuelAI naming requirements")
 @click.option("--drop_leading_underscore", is_flag=True, help="If replacing class name characters, should a potential leading `_` be dropped?")
-def fuelai_export(dataset_path: str, force: bool, drop_leading_underscore: bool):
-    dataset = SeraphDataset(dataset_path)
+def fuelai_export(dataset_dir: str, force: bool, drop_leading_underscore: bool):
+    dataset = SeraphDataset(dataset_dir)
     classes = dataset.get_classes()
 
     mod_classes = [c for c in classes if re.search(CLASS_NAME_REPLACE_PATTERN, c) is not None]
@@ -249,18 +249,18 @@ def fuelai_export(dataset_path: str, force: bool, drop_leading_underscore: bool)
 
     fuelai_classes = [{"name": c} for c in classes_tmp]
 
-    fq_output_filename = os.path.join(dataset_path, "fuelai-classes.json")
+    fq_output_filename = os.path.join(dataset_dir, "fuelai-classes.json")
     write_json(fq_output_filename, fuelai_classes)
 
 
 @fuelai.command("import")
-@click.option("--dataset_path", default=".")
+@click.option("--dataset_dir", default=".")
 @click.option("--fuelai_metadata_file", required=True)
 @click.option("--sort_classes", is_flag=True)
 @click.option("--force", is_flag=True)
-def fuelai_import(dataset_path: str, fuelai_metadata_file: str, sort_classes: bool, force: bool):
+def fuelai_import(dataset_dir: str, fuelai_metadata_file: str, sort_classes: bool, force: bool):
     try:
-        SeraphDataset.directory_is_seraph_dataset(dataset_path)
+        SeraphDataset.directory_is_seraph_dataset(dataset_dir)
         new_dataset = False
     except ValueError:
         new_dataset = True
@@ -268,7 +268,7 @@ def fuelai_import(dataset_path: str, fuelai_metadata_file: str, sort_classes: bo
     if new_dataset:
         print("[yellow]Sorry, this isn't implemented yet[/yellow]")
     else:
-        dataset = SeraphDataset(dataset_path)
+        dataset = SeraphDataset(dataset_dir)
         classes = dataset.get_classes()
         if len(classes) > 0 and not force:
             print("[yellow]Dataset already has classes listed; to append to existing class list, retry with `--force` flag[/yellow]")

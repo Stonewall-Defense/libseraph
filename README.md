@@ -61,14 +61,12 @@ python -m coverage html
 
 ### Tests to Write
 
-- exec
+- No Coverage
   - audio
-  - classes
   - integrations
-  - meta
   - provenance
-  - prune
-  - splits
+- Partial Coverage
+  - meta
   - version
 
 ## TODO

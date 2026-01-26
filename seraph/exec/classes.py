@@ -30,6 +30,38 @@ def _init_class_map(class_list: list[str]) -> dict[str, float]:
     return mapped_class_totals
 
 
+def _class_balance_impl(metadata: list[dict],
+                        class_list: list[str],
+                        len_col_name: Optional[str] = None,
+                        split_col_name: Optional[str] = None,
+                        ):
+    results: list[tuple[Optional[str], dict[str, float]]] = []
+
+    if split_col_name:
+        tmp: dict[str, dict[str, float]] = {}
+        for record in metadata:
+            cls = record["class_name"]
+            split = record[split_col_name]
+            siz = record[len_col_name] if len_col_name else 1
+            siz = siz or 1
+
+            tmp.setdefault(split, _init_class_map(class_list))
+            tmp[split][cls] += float(siz)
+        for key, value in tmp.items():
+            results.append((key, value))
+    else:
+        mapped_class_totals = _init_class_map(class_list)
+
+        for record in metadata:
+            cls = record["class_name"]
+            siz = record[len_col_name] if len_col_name else 1
+            siz = siz or 1
+            mapped_class_totals[cls] += float(siz)
+        results.append((None, mapped_class_totals))
+
+    return results
+
+
 def _ratio_color(siz: float, max_siz: float):
     ratio = siz / max_siz
 
@@ -380,29 +412,7 @@ def classes_check_balance(dataset_dir: str, len_col_name: Optional[str], split_c
     _, metadata = dataset.get_metadata()
     class_list = dataset.get_classes()
 
-    results: list[tuple[Optional[str], dict[str, float]]] = []
-
-    if split_col_name:
-        tmp: dict[str, dict[str, float]] = {}
-        for record in metadata:
-            cls = record["class_name"]
-            split = record[split_col_name]
-            siz = record[len_col_name] if len_col_name else 1
-            siz = siz or 1
-
-            tmp.setdefault(split, _init_class_map(class_list))
-            tmp[split][cls] += float(siz)
-        for key, value in tmp.items():
-            results.append((key, value))
-    else:
-        mapped_class_totals = _init_class_map(class_list)
-
-        for record in metadata:
-            cls = record["class_name"]
-            siz = record[len_col_name] if len_col_name else 1
-            siz = siz or 1
-            mapped_class_totals[cls] += float(siz)
-        results.append((None, mapped_class_totals))
+    results = _class_balance_impl(metadata, class_list, len_col_name, split_col_name)
 
     for name, result in results:
         _pprint_class_balance(class_list, result, name)

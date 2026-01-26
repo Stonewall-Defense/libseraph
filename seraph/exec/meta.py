@@ -3,6 +3,7 @@
 ###############################################################################
 from dataclasses import asdict
 from itertools import zip_longest
+import os
 from typing import Optional
 from uuid import uuid4
 
@@ -161,9 +162,9 @@ def meta():
 
 
 @meta.command("init")
-@click.option("--dataset_path", default=".")
+@click.option("--dataset_dir", default=".")
 @click.option("--override", default=False)
-def meta_init(dataset_path: str, override: bool):
+def meta_init(dataset_dir: str, override: bool):
     # Get the core metadata fields from the user
     dataset_id = get_user_input("Enter a dataset ID: ")
     if not dataset_id:
@@ -212,26 +213,26 @@ def meta_init(dataset_path: str, override: bool):
         seraph_file_data["license"] = license
 
     # Write the file itself
-    SeraphDataset.create(dataset_path, seraph_file_data, override)
+    SeraphDataset.create(dataset_dir, seraph_file_data, override)
 
     # Ensure necessary dirs exists
-    HistoryManager.initialize(dataset_path)
+    HistoryManager.initialize(dataset_dir)
 
 
 @meta.command("derive")
-@click.option("--dataset_path", default=".")
+@click.option("--dataset_dir", default=".")
 @click.option("--parent_dataset", required=True)
 @click.option("--uri", required=True)
-def meta_derive(dataset_path: str, parent_dataset: str, uri: str):
+def meta_derive(dataset_dir: str, parent_dataset: str, uri: str):
     parent = SeraphDataset(parent_dataset)
-    derive_dataset(parent, dataset_path, uri)
+    derive_dataset(parent, dataset_dir, uri)
 
 
 @meta.command("verify")
-@click.option("--dataset_path", default=".")
+@click.option("--dataset_dir", default=".")
 @click.option("--output_format", default="print", type=click.Choice(VERIFY_OUTPUT_FORMATS))
-def meta_verify(dataset_path: str, output_format: str):
-    dataset = SeraphDataset(dataset_path)
+def meta_verify(dataset_dir: str, output_format: str):
+    dataset = SeraphDataset(dataset_dir)
 
     headers, _ = dataset.get_metadata()
 
@@ -257,11 +258,12 @@ def meta_verify(dataset_path: str, output_format: str):
     else:
         COLUMNS = ["missing_headers", "dupe_headers"]
         if fmt == VerifyOutputFormat.CSV:
-            write_csv("metadata-verification-errors.csv",
+            write_csv(os.path.join(dataset_dir, "metadata-verification-errors.csv"),
                       COLUMNS,
                       [{"missing_headers": m, "dupe_headers": d} for m, d in zip_longest(missing_headers, dupe_headers)])
         elif fmt == VerifyOutputFormat.JSON:
-            write_json("metadata-verification-errors.json", {"missing_headers": missing_headers, "dupe_headers": dupe_headers})
+            write_json(os.path.join(dataset_dir, "metadata-verification-errors.json"),
+                       {"missing_headers": missing_headers, "dupe_headers": dupe_headers})
         else:
             table = Table(
                 *COLUMNS,
@@ -274,11 +276,11 @@ def meta_verify(dataset_path: str, output_format: str):
 
 
 @meta.command("datum-id")
-@click.option("--dataset_path", default=".")
+@click.option("--dataset_dir", default=".")
 @click.option("--datum_col_name", default="datum_id")
 @click.option("--start_from_1", is_flag=True)
-def meta_datum_id(dataset_path: str, datum_col_name: str, start_from_1: bool):
-    dataset = SeraphDataset(dataset_path)
+def meta_datum_id(dataset_dir: str, datum_col_name: str, start_from_1: bool):
+    dataset = SeraphDataset(dataset_dir)
 
     headers, records = dataset.get_metadata()
 

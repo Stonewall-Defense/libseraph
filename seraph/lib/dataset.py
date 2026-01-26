@@ -347,35 +347,35 @@ class SeraphDataset:
             raise ValueError("Input dir is not a Seraph dataset: no `data/` directory")
 
     @staticmethod
-    def ensure_internal_dirs_exist(dataset_path: str):
+    def ensure_internal_dirs_exist(dataset_dir: str):
         # Ensure data dir exists
-        fq_data_dirname = os.path.join(dataset_path, DATA_DIR)
+        fq_data_dirname = os.path.join(dataset_dir, DATA_DIR)
         pathlib.Path(fq_data_dirname).mkdir(parents=True, exist_ok=True)
 
-        return fq_data_dirname, HistoryManager(dataset_path)
+        return fq_data_dirname, HistoryManager(dataset_dir)
 
     @staticmethod
-    def create(dataset_path: str, seraph_raw: dict[str, Any], override: bool):
+    def create(dataset_dir: str, seraph_raw: dict[str, Any], override: bool):
         seraph = _serialize_seraph(seraph_raw)
-        fq_seraph_filename = os.path.join(dataset_path, SERAPH_FILENAME)
+        fq_seraph_filename = os.path.join(dataset_dir, SERAPH_FILENAME)
         with open(fq_seraph_filename, "x") as outfile:
             outfile.write(json.dumps(seraph, indent=2))
 
         # Empty `classes.json` file
-        fq_class_filename = os.path.join(dataset_path, CLASSFILE_NAME)
+        fq_class_filename = os.path.join(dataset_dir, CLASSFILE_NAME)
         if os.path.isfile(fq_class_filename) and not override:
             raise RuntimeError("Class file already exists")
         else:
             write_json(fq_class_filename, [])
 
         # Placeholder `metadata.csv` file
-        fq_metadata_filename = os.path.join(dataset_path, PREFERRED_METADATA_FILENAME)
+        fq_metadata_filename = os.path.join(dataset_dir, PREFERRED_METADATA_FILENAME)
         if os.path.isfile(fq_metadata_filename) and not override:
             raise RuntimeError("Metadata file already exists")
         else:
             write_csv(fq_metadata_filename, REQUIRED_METADATA_FIELD_NAMES, [])
 
-        fq_data_dir = os.path.join(dataset_path, DATA_DIR)
+        fq_data_dir = os.path.join(dataset_dir, DATA_DIR)
         os.makedirs(fq_data_dir, exist_ok=True)
 
 
