@@ -119,9 +119,9 @@ def prune_column(dataset_dir: str, column_name: tuple[str]):
 
 @prune.command("rows", help="Remove all metadata records with the provided value in the provided column")
 @click.option("--dataset_dir", default=".")
-@click.option("--column_name", required=True)
-@click.option("--rm_row_val")
-@click.option("--remove_empty", is_flag=True)
+@click.option("--column_name", required=True, help="The column name to scan for removable matches")
+@click.option("--rm_row_val", help="The value to match for removal (as a string)")
+@click.option("--remove_empty", is_flag=True, help="Remove rows where the chosen column is empty")
 def prune_rows(dataset_dir: str,
                column_name: str,
                rm_row_val: Optional[str],
@@ -174,7 +174,7 @@ def prune_rows(dataset_dir: str,
 
 @prune.command("dupes", help="Remove all but the first metadata record with a duplicate value for `identity_column`")
 @click.option("--dataset_dir", default=".")
-@click.option("--identity_column", required=True)
+@click.option("--identity_column", required=True, help="Column to use to scan for duplicates")
 def prune_dupes(dataset_dir: str, identity_column: str):
     dataset = SeraphDataset(dataset_dir)
     data_dir = dataset.get_data_dir()

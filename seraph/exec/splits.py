@@ -191,13 +191,13 @@ def splits():
 
 
 @splits.command("train-test", help="Generate class-balanced train/test and optionally validate splits")
-@click.option("--split_type", default="80_20", type=click.Choice(SPLIT_CHOICES))
 @click.option("--dataset_dir", default=".")
+@click.option("--split_type", default="80_20", type=click.Choice(SPLIT_CHOICES))
 @click.option("--identity_col_name", default="filename")
-@click.option("--len_col_name")
-@click.option("--random_seed", type=int)
-@click.option("--shuffle_segments", default=True)
-@click.option("--incoherent", is_flag=True)
+@click.option("--len_col_name", help="Column to identify length/size of a piece of data, if any (and relevant)")
+@click.option("--random_seed", type=int, help="Optional, use for reproducibility")
+@click.option("--shuffle_segments", default=True, help="Randomize order of segments where duration(s) are equal")
+@click.option("--incoherent", is_flag=True, help="Do not use identity column to avoid possible leakage")
 def train_test_splits(split_type: str,
                       dataset_dir: str,
                       identity_col_name: str,
@@ -244,14 +244,14 @@ def train_test_splits(split_type: str,
 
 
 @splits.command("fold", help="Generate splits for k-fold cross-validation")
-@click.option("--n_folds", default=10)
 @click.option("--dataset_dir", default=".")
+@click.option("--n_folds", default=10)
 @click.option("--identity_col_name", default="filename")
-@click.option("--len_col_name")
-@click.option("--random_seed", type=int)
-@click.option("--shuffle_segments", default=True)
-@click.option("--shuffle_folds", default=True)
-@click.option("--incoherent", is_flag=True)
+@click.option("--len_col_name", help="Column to identify length/size of a piece of data, if any (and relevant)")
+@click.option("--random_seed", type=int, help="Optional, use for reproducibility")
+@click.option("--shuffle_segments", default=True, help="Randomize order of segments where duration(s) are equal")
+@click.option("--shuffle_folds", default=True, help="Randomize the order of generates folds per class")
+@click.option("--incoherent", is_flag=True, help="Do not use identity column to avoid possible leakage")
 def fold_splits(n_folds: int,
                 dataset_dir: str,
                 identity_col_name: str,
