@@ -62,7 +62,6 @@ python -m coverage html
 ### Tests to Write
 
 - No Coverage
-  - audio
   - integrations
   - provenance
 - Partial Coverage

@@ -28,7 +28,7 @@ import torchaudio
 # Local Imports
 ###############################################################################
 from ..lib import REQUIRED_METADATA_FIELD_NAMES, REQUIRED_METADATA_IMPORT_COLS, VERIFY_OUTPUT_FORMATS
-from ..lib import str_to_enum, write_csv
+from ..lib import str_to_enum, write_csv, write_json
 from ..lib import SeraphDataset, VersionBumpType, ChangeType, ChangeRecord, ImportRecord, SeraphMetadataError, VerifyOutputFormat, SupportedMediaType
 
 
@@ -681,6 +681,7 @@ def audio():
 
 
 @audio.command("import", help="Import audio data from an external Seraph dataset")
+@click.option("--dataset_dir", default=".")
 @click.option("--import_dir", required=True, help="The directory from which to import data")
 @click.option("--metadata_field_merge_strat", default="append", type=click.Choice(METADATA_FIELD_MERGE_STRATEGIES), help="What should be done with unmatched metadata columns?")
 @click.option("--media_subtype_merge_strat", default="reject", type=click.Choice(AUDIO_BASE_MERGE_STRATEGIES), help="What should be done if the audio subtypes differ between datasets?")
@@ -691,7 +692,8 @@ def audio():
 @click.option("--class_exclude", multiple=True, help="One or more classes from the remote dataset to exclude")
 @click.option("--min_length_secs", type=int)
 @click.option("--duration_col_name", default=DURATION_COL_DEFAULT_NAME, help="This parameter has no effect if `min_length_secs` is not set")
-def audio_import(import_dir: str,
+def audio_import(dataset_dir: str,
+                 import_dir: str,
                  metadata_field_merge_strat: str,
                  media_subtype_merge_strat: str,
                  channel_merge_strat: str,
@@ -702,7 +704,7 @@ def audio_import(import_dir: str,
                  min_length_secs: Optional[int],
                  duration_col_name: str,
                  ):
-    local_dataset = SeraphDataset(".")
+    local_dataset = SeraphDataset(dataset_dir)
     remote_dataset = SeraphDataset(import_dir)
 
     metadata_field_merge_strat_fmt = str_to_enum(metadata_field_merge_strat, MetadataFieldMergeStrategy)
@@ -883,9 +885,12 @@ def audio_verify(dataset_dir: str, output_format: str, check_file_len: bool, che
     else:
         COLUMNS = ["filename", "subtype", "sample_rate", "channels", "bit_depth", "is_empty", "no_audio"]
         if fmt == VerifyOutputFormat.CSV:
-            write_csv("verification-errors.csv",
+            write_csv(os.path.join(dataset_dir, "verification-errors.csv"),
                       COLUMNS,
                       [asdict(v) for v in violations])
+        elif fmt == VerifyOutputFormat.JSON:
+            output = [asdict(v) for v in violations]
+            write_json(os.path.join(dataset_dir, "verification-errors.json"), output)
         else:
             table = Table(
                 *COLUMNS,

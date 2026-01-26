@@ -15,7 +15,6 @@ from click.testing import CliRunner
 ###############################################################################
 from seraph.lib.common import read_json
 from seraph.lib.dataset import SeraphDataset
-from seraph.lib.history import ChangeRecord, ChangeType, VersionBumpType
 from _config import TEST_DATASET_ALPHA
 
 ###############################################################################
