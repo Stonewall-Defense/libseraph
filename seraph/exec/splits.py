@@ -185,12 +185,12 @@ def _make_ttv_split_params(split_choice: SplitChoice):
 ###############################################################################
 # ! Commands
 ###############################################################################
-@click.group("splits")
+@click.group("splits", help="Commands for generating train/validate/test and cross-fold valitation splits")
 def splits():
     pass
 
 
-@splits.command("train-test")
+@splits.command("train-test", help="Generate class-balanced train/test and optionally validate splits")
 @click.option("--split_type", default="80_20", type=click.Choice(SPLIT_CHOICES))
 @click.option("--dataset_dir", default=".")
 @click.option("--identity_col_name", default="filename")
@@ -243,7 +243,7 @@ def train_test_splits(split_type: str,
     dataset.set_metadata_headers(fieldnames, change_record=change).set_metadata_records(metadata).save()
 
 
-@splits.command("fold")
+@splits.command("fold", help="Generate splits for k-fold cross-validation")
 @click.option("--n_folds", default=10)
 @click.option("--dataset_dir", default=".")
 @click.option("--identity_col_name", default="filename")

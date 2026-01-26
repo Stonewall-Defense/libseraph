@@ -28,7 +28,7 @@ CLASS_NAME_REPLACE_PATTERN = re.compile(r'[^\w\s]')
 ###############################################################################
 # ! Commands
 ###############################################################################
-@click.group("integrations")
+@click.group("integrations", help="[EXPERIMENTAL] Import/export to 3PP data management formats")
 def integrations():
     pass
 

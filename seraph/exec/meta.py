@@ -156,12 +156,12 @@ def _get_authors_from_user():
 ###############################################################################
 # ! Commands
 ###############################################################################
-@click.group("meta")
+@click.group("meta", help="Commands for initializing and verifying Seraph metadata")
 def meta():
     pass
 
 
-@meta.command("init")
+@meta.command("init", help="Initialize a new Seraph dataset")
 @click.option("--dataset_dir", default=".")
 @click.option("--override", default=False)
 def meta_init(dataset_dir: str, override: bool):
@@ -219,7 +219,7 @@ def meta_init(dataset_dir: str, override: bool):
     HistoryManager.initialize(dataset_dir)
 
 
-@meta.command("derive")
+@meta.command("derive", help="Generate a metadata collection that provides a view of the parent dataset")
 @click.option("--dataset_dir", default=".")
 @click.option("--parent_dataset", required=True)
 @click.option("--uri", required=True)
@@ -228,7 +228,7 @@ def meta_derive(dataset_dir: str, parent_dataset: str, uri: str):
     derive_dataset(parent, dataset_dir, uri)
 
 
-@meta.command("verify")
+@meta.command("verify", help="Verify that the metadata has no missing or duplicate headers")
 @click.option("--dataset_dir", default=".")
 @click.option("--output_format", default="print", type=click.Choice(VERIFY_OUTPUT_FORMATS))
 def meta_verify(dataset_dir: str, output_format: str):
@@ -275,7 +275,7 @@ def meta_verify(dataset_dir: str, output_format: str):
             print(table)
 
 
-@meta.command("datum-id")
+@meta.command("datum-id", help="Add an ascending `datum_id` column to all metadata records")
 @click.option("--dataset_dir", default=".")
 @click.option("--datum_col_name", default="datum_id")
 @click.option("--start_from_1", is_flag=True)

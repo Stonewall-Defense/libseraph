@@ -135,12 +135,12 @@ def _submit_license(prov: ProvMeta, prov_url: str):
 ###############################################################################
 # ! Commands
 ###############################################################################
-@click.group("prov")
+@click.group("prov", help="[EXPERIMENTAL] Manage provenance with Prospero from SIFT Technologies")
 def prov():
     pass
 
 
-@prov.command("show")
+@prov.command("show", help="Show provenance updates per version")
 @click.option("--dataset_dir", default=".")
 @click.option("--version")
 def show_prov(dataset_dir: str, version: Optional[str]):
@@ -170,7 +170,7 @@ def show_prov(dataset_dir: str, version: Optional[str]):
             print(f"\t- {mod.message}")
 
 
-@prov.command("submit")
+@prov.command("submit", help="Submit a dataset or update to Prospero")
 @click.option("--dataset_dir", default=".")
 @click.option("--activity_label", required=True)
 @click.option("--activity_keywords", multiple=True)

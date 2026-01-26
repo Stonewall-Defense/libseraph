@@ -190,7 +190,7 @@ def _update_changelog(release: str, fq_changelog_path: str):
 ###############################################################################
 # ! Commands
 ###############################################################################
-@click.group("version")
+@click.group("version", help="[EXPERIMENTAL] Commands for managing dataset versioning")
 def version():
     """
         References:
@@ -200,7 +200,7 @@ def version():
     pass
 
 
-@version.command("show")
+@version.command("show", help="Show updates for the current version")
 @click.option("--dataset_dir", default=".")
 def version_show(dataset_dir: str):
     dataset = SeraphDataset(dataset_dir)
@@ -222,7 +222,7 @@ def version_show(dataset_dir: str):
     _pprint_change_list(changes)
 
 
-@version.command("list")
+@version.command("list", help="Show update history for all versions")
 @click.option("--dataset_dir", default=".")
 @click.option("--versions", multiple=True, help="The versions to show, if any")
 def version_list(dataset_dir: str, versions: tuple[str]):
@@ -246,9 +246,9 @@ def version_list(dataset_dir: str, versions: tuple[str]):
         _pprint_change_list(changes=record.changes)
 
 
-@version.command("bump")
+@version.command("bump", help="Bump version IAW semver rules and recent update history")
 @click.option("--dataset_dir", default=".")
-@click.option("--notice")
+@click.option("--notice", help="Add a notice (https://common-changelog.org/#23-notice) to the changelog when applying this update")
 @click.option("--initial_release", is_flag=True, help="Bump directly to version 1.0.0 iff major version is 0")
 @click.option("--dry_run", is_flag=True)
 def version_bump(dataset_dir: str, notice: Optional[str], initial_release: bool, dry_run: bool):

@@ -36,12 +36,12 @@ def _remove_files(data_dir: str, files_to_keep: set[str], dry_run=False):
 ###############################################################################
 # ! Commands
 ###############################################################################
-@click.group("prune")
+@click.group("prune", help="Commands for intelligently removing (meta)data from the dataset")
 def prune():
     pass
 
 
-@prune.command("files")
+@prune.command("files", help="Remove all files without a corresponding metadata record")
 @click.option("--dataset_dir", default=".")
 @click.option("--dry_run", is_flag=True)
 def prune_files(dataset_dir: str, dry_run: bool):
@@ -61,7 +61,7 @@ def prune_files(dataset_dir: str, dry_run: bool):
         dataset.register_patch_update(change).save()
 
 
-@prune.command("records")
+@prune.command("records", help="Remove all metadata records without a corresponding data file")
 @click.option("--dataset_dir", default=".")
 @click.option("--dry_run", is_flag=True)
 def prune_records(dataset_dir: str, dry_run: bool):
@@ -91,7 +91,7 @@ def prune_records(dataset_dir: str, dry_run: bool):
         dataset.set_metadata_records(metadata_records, change_record=change).save()
 
 
-@prune.command("column")
+@prune.command("column", help="Remove a columnar property from every metadata record")
 @click.option("--dataset_dir", default=".")
 @click.option("--column_name", multiple=True, required=True)
 def prune_column(dataset_dir: str, column_name: tuple[str]):
@@ -117,7 +117,7 @@ def prune_column(dataset_dir: str, column_name: tuple[str]):
     dataset.set_multiple(metadata_headers=headers, metadata_records=metadata_records, change_records=[change]).save()
 
 
-@prune.command("rows")
+@prune.command("rows", help="Remove all metadata records with the provided value in the provided column")
 @click.option("--dataset_dir", default=".")
 @click.option("--column_name", required=True)
 @click.option("--rm_row_val")
@@ -172,7 +172,7 @@ def prune_rows(dataset_dir: str,
         dataset.set_metadata_records(new_metadata_records, change_record=change).save()
 
 
-@prune.command("dupes")
+@prune.command("dupes", help="Remove all but the first metadata record with a duplicate value for `identity_column`")
 @click.option("--dataset_dir", default=".")
 @click.option("--identity_column", required=True)
 def prune_dupes(dataset_dir: str, identity_column: str):

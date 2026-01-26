@@ -120,12 +120,12 @@ def _print_class_match_list(matches: list[str], survivors: list[str], target: st
 ###############################################################################
 # ! Commands
 ###############################################################################
-@click.group("classes")
+@click.group("classes", help="Commands for updating the classes defined in a dataset")
 def classes():
     pass
 
 
-@classes.command("switch")
+@classes.command("switch", help="Switch the classes from one metadata column to another while keeping the original class data")
 @click.option("--dataset_dir", default=".")
 @click.option("--new_class_col", required=True)
 @click.option("--new_name_for_current_class_col", required=True)
@@ -184,7 +184,7 @@ def switch_classes(dataset_dir: str,
     dataset.save()
 
 
-@classes.command("rename")
+@classes.command("rename", help="Rename one class to a new name not already present in the metadata")
 @click.option("--dataset_dir", default=".")
 @click.option("--new_class_name", required=True)
 @click.option("--old_class_name", required=True)
@@ -230,7 +230,7 @@ def rename_classes(dataset_dir: str,
     dataset.save()
 
 
-@classes.command("merge")
+@classes.command("merge", help="Merge one or more classes into a new or existing class")
 @click.option("--dataset_dir", default=".")
 @click.option("--target_class_name", required=True)
 @click.option("--classes_to_merge", required=True, multiple=True)
@@ -286,7 +286,7 @@ def merge_classes(dataset_dir: str,
     dataset.save()
 
 
-@classes.command("regex-merge")
+@classes.command("regex-merge", help="Merge all classes matching a regex into a new or existing class")
 @click.option("--dataset_dir", default=".")
 @click.option("--target_class_name", required=True)
 @click.option("--sort_classes", default=True)
@@ -347,7 +347,7 @@ def merge_classes_regex(dataset_dir: str,
     dataset.save()
 
 
-@classes.command("drop")
+@classes.command("drop", help="Drop a class and all records associated with it")
 @click.option("--dataset_dir", default=".")
 @click.option("--class_name", multiple=True)
 @click.option("--sort_classes", default=True)
@@ -402,7 +402,7 @@ def drop_class(dataset_dir: str,
     dataset.save()
 
 
-@classes.command("check-balance")
+@classes.command("check-balance", help="Show whole-dataset or per-split/fold class balance")
 @click.option("--dataset_dir", default=".")
 @click.option("--len_col_name")
 @click.option("--split_col_name")
@@ -418,7 +418,7 @@ def classes_check_balance(dataset_dir: str, len_col_name: Optional[str], split_c
         _pprint_class_balance(class_list, result, name)
 
 
-@classes.command("compose")
+@classes.command("compose", help="Add class information to a non-seraph dataset")
 @click.option("--target_dir", default=".")
 @click.option("--compose_col", multiple=True)
 @click.option("--separator_char", default=" ")

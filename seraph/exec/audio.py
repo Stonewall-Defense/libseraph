@@ -690,7 +690,7 @@ def audio():
 @click.option("--subtype_value_merge_strat", default="reject", type=click.Choice(AUDIO_BASE_MERGE_STRATEGIES), help="What should be done if misc subtype values differ between datasets?")
 @click.option("--class_select", multiple=True, help="One or more classes to cherry-pick from the remote dataset")
 @click.option("--class_exclude", multiple=True, help="One or more classes from the remote dataset to exclude")
-@click.option("--min_length_secs", type=int)
+@click.option("--min_length_secs", type=int, help="Files from the import dataset less than this value will be ignored")
 @click.option("--duration_col_name", default=DURATION_COL_DEFAULT_NAME, help="This parameter has no effect if `min_length_secs` is not set")
 def audio_import(dataset_dir: str,
                  import_dir: str,
@@ -732,7 +732,7 @@ def audio_import(dataset_dir: str,
                           )
 
 
-@audio.command("duration")
+@audio.command("duration", help="Add a duration (secs) column to audio metadata")
 @click.option("--dataset_dir", default=".")
 @click.option("--metadata_column_conflict_strat", default="reject", type=click.Choice(METADATA_COLUMN_CONFLICT_STRATEGIES))
 def audio_add_duration(dataset_dir: str,
@@ -775,12 +775,12 @@ def audio_add_duration(dataset_dir: str,
     dataset.set_metadata_headers(fieldnames, change_record=change).set_metadata_records(metadata).save()
 
 
-@audio.command("clip")
+@audio.command("clip", help="Clip audio data to a specified length (in secs) and update metadata")
 @click.option("--clip_duration_secs", type=float, required=True)
 @click.option("--dataset_dir", default=".")
 @click.option("--duration_col_name", default=DURATION_COL_DEFAULT_NAME)
 @click.option("--clip_end_strategy", default="extend", type=click.Choice(CLIP_END_STRAEGIES), help="If a duration is not evenly divisible by clip_duration_secs, what happens to the last clip?")
-@click.option("--force", is_flag=True)
+@click.option("--force", is_flag=True, help="If not provided, will fail to clip audio that appears to have already been clipped")
 @click.option("--dry_run", is_flag=True)
 def audio_clip_files(clip_duration_secs: float,
                      dataset_dir: str,
@@ -796,9 +796,9 @@ def audio_clip_files(clip_duration_secs: float,
     _clip_audio_files(dataset, clip_duration_secs, duration_col_name, end_strat, force, dry_run)
 
 
-@audio.command("resample")
+@audio.command("resample", help="Resample an entire audio dataset to a single sample rate")
 @click.option("--dataset_dir", default=".")
-@click.option("--target_sr", type=int, required=True)
+@click.option("--target_sr", type=int, required=True, help="In Hz, must NOT be higher than the lowest sample rate of the dataset")
 def audio_resample(dataset_dir: str, target_sr: int):
     dataset = SeraphDataset(dataset_dir)
 
@@ -829,7 +829,7 @@ def audio_resample(dataset_dir: str, target_sr: int):
 
 
 # TODO: Support more than just lossless audio and use the expected metadata to drive the logic
-@audio.command("verify")
+@audio.command("verify", help="Verify that every file in the dataset conforms to the proper media metadata contract")
 @click.option("--dataset_dir", default=".")
 @click.option("--output_format", default="print", type=click.Choice(VERIFY_OUTPUT_FORMATS))
 @click.option("--check_file_len", is_flag=True, help="Warn of files with no audio length")
@@ -902,7 +902,7 @@ def audio_verify(dataset_dir: str, output_format: str, check_file_len: bool, che
             print(table)
 
 
-@audio.command("prune")
+@audio.command("prune", help="Remove silent and/or empty audio files from the dataset")
 @click.option("--dataset_dir", default=".")
 @click.option("--remove_zero_len", is_flag=True, help="Remove files with duration of 0 sec")
 @click.option("--remove_silence", is_flag=True, help="Remove files that contain only silence")
