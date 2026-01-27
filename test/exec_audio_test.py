@@ -4,6 +4,7 @@
 import os
 import shutil
 import tempfile
+import warnings
 
 ###############################################################################
 # 3PP Imports
@@ -112,8 +113,6 @@ class TestAudioMethods(unittest.TestCase):
 
         expected = "No dataset contract violations!\n\n"
 
-        print(result.output)
-
         self.assertTrue(result.output.endswith(expected))
 
     def test_audio_verify_fail(self):
@@ -146,6 +145,9 @@ class TestAudioMethods(unittest.TestCase):
         fq_target = os.path.join(fq_data_dir, target_file["filename"])
         wave, sr = torchaudio.load(fq_target, normalize=True)
         wave = torch.zeros_like(wave)
+
+        # This function is deprecated but we will not be upgrading, so it doesn't matter
+        warnings.filterwarnings("ignore", category=UserWarning)
         torchaudio.save(fq_target, wave, sample_rate=sr, encoding="PCM_S", bits_per_sample=16)
 
         self.runner.invoke(audio_prune, [

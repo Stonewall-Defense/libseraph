@@ -162,7 +162,7 @@ def meta():
 
 
 @meta.command("init", help="Initialize a new Seraph dataset")
-@click.option("--dataset_dir", default=".")
+@click.option("--dataset_dir", "-d", default=".")
 @click.option("--override", default=False)
 def meta_init(dataset_dir: str, override: bool):
     # Get the core metadata fields from the user
@@ -220,17 +220,17 @@ def meta_init(dataset_dir: str, override: bool):
 
 
 @meta.command("derive", help="Generate a metadata collection that provides a view of the parent dataset")
-@click.option("--dataset_dir", default=".")
-@click.option("--parent_dataset", required=True)
-@click.option("--uri", required=True)
+@click.option("--dataset_dir", "-d", default=".")
+@click.option("--parent_dataset", "-p", required=True)
+@click.option("--uri", required=True, help="The base URI of the new dataset view")
 def meta_derive(dataset_dir: str, parent_dataset: str, uri: str):
     parent = SeraphDataset(parent_dataset)
     derive_dataset(parent, dataset_dir, uri)
 
 
 @meta.command("verify", help="Verify that the metadata has no missing or duplicate headers")
-@click.option("--dataset_dir", default=".")
-@click.option("--output_format", default="print", type=click.Choice(VERIFY_OUTPUT_FORMATS))
+@click.option("--dataset_dir", "-d", default=".")
+@click.option("--output_format", "-o", default="print", type=click.Choice(VERIFY_OUTPUT_FORMATS))
 def meta_verify(dataset_dir: str, output_format: str):
     dataset = SeraphDataset(dataset_dir)
 
@@ -276,7 +276,7 @@ def meta_verify(dataset_dir: str, output_format: str):
 
 
 @meta.command("datum-id", help="Add an ascending `datum_id` column to all metadata records")
-@click.option("--dataset_dir", default=".")
+@click.option("--dataset_dir", "-d", default=".")
 @click.option("--datum_col_name", default="datum_id")
 @click.option("--start_from_1", is_flag=True)
 def meta_datum_id(dataset_dir: str, datum_col_name: str, start_from_1: bool):

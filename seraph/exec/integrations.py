@@ -35,7 +35,7 @@ def integrations():
 
 # See https://datatracker.ietf.org/doc/html/rfc8493
 @integrations.command("bagit", help="https://datatracker.ietf.org/doc/html/rfc8493")
-@click.option("--dataset_dir", default=".")
+@click.option("--dataset_dir", "-d", default=".")
 @click.option("--namaste", is_flag=True)
 def bagit(dataset_dir: str, namaste: bool):
     try:
@@ -73,8 +73,8 @@ def datapackage():
 
 
 @datapackage.command("export")
-@click.option("--dataset_dir", default=".")
-@click.option("--output_filename", default="datapackage.json")
+@click.option("--dataset_dir", "-d", default=".")
+@click.option("--output_filename", "-o", default="datapackage.json")
 def datapackage_export(dataset_dir: str, output_filename: str):
     dataset = SeraphDataset(dataset_dir)
     seraph_meta = dataset.get_seraph_metadata()
@@ -161,8 +161,8 @@ def datapackage_export(dataset_dir: str, output_filename: str):
     write_json(fq_output_filename, package)
 
 
-@click.option("--dataset_dir", default=".")
-@click.option("--input_filename", default="datapackage.json")
+@click.option("--dataset_dir", "-d", default=".")
+@click.option("--input_filename", "-i", default="datapackage.json")
 @datapackage.command("import")
 def datapackage_import(dataset_dir: str, input_filename: str):
     try:
@@ -181,7 +181,7 @@ def rocrate():
 
 
 @rocrate.command("export")
-@click.option("--dataset_dir", default=".")
+@click.option("--dataset_dir", "-d", default=".")
 @click.option("--preview", is_flag=True)
 def rocrate_export(dataset_dir: str, preview: bool):
     try:
@@ -228,7 +228,7 @@ def fuelai():
 
 
 @fuelai.command("export", help="Export Seaph `classes.json` file to FuelAI format")
-@click.option("--dataset_dir", default=".", help="Root DIR of the Seraph dataset to export")
+@click.option("--dataset_dir", "-d", default=".", help="Root DIR of the Seraph dataset to export")
 @click.option("--force", is_flag=True, help="Replace non-word characters with `_` IAW FuelAI naming requirements")
 @click.option("--drop_leading_underscore", is_flag=True, help="If replacing class name characters, should a potential leading `_` be dropped?")
 def fuelai_export(dataset_dir: str, force: bool, drop_leading_underscore: bool):
@@ -254,8 +254,8 @@ def fuelai_export(dataset_dir: str, force: bool, drop_leading_underscore: bool):
 
 
 @fuelai.command("import")
-@click.option("--dataset_dir", default=".")
-@click.option("--fuelai_metadata_file", required=True)
+@click.option("--dataset_dir", "-d", default=".")
+@click.option("--fuelai_metadata_file", "-f", required=True)
 @click.option("--sort_classes", is_flag=True)
 @click.option("--force", is_flag=True)
 def fuelai_import(dataset_dir: str, fuelai_metadata_file: str, sort_classes: bool, force: bool):

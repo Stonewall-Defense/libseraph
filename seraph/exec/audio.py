@@ -681,8 +681,8 @@ def audio():
 
 
 @audio.command("import", help="Import audio data from an external Seraph dataset")
-@click.option("--dataset_dir", default=".")
-@click.option("--import_dir", required=True, help="The directory from which to import data")
+@click.option("--dataset_dir", "-d", default=".")
+@click.option("--import_dir", "-i", required=True, help="The directory from which to import data")
 @click.option("--metadata_field_merge_strat", default="append", type=click.Choice(METADATA_FIELD_MERGE_STRATEGIES), help="What should be done with unmatched metadata columns?")
 @click.option("--media_subtype_merge_strat", default="reject", type=click.Choice(AUDIO_BASE_MERGE_STRATEGIES), help="What should be done if the audio subtypes differ between datasets?")
 @click.option("--channel_merge_strat", default="reject", type=click.Choice(AUDIO_MIX_MERGE_STRATEGIES), help="What should be done if the number of audio channels differ between datasets?")
@@ -733,7 +733,7 @@ def audio_import(dataset_dir: str,
 
 
 @audio.command("duration", help="Add a duration (secs) column to audio metadata")
-@click.option("--dataset_dir", default=".")
+@click.option("--dataset_dir", "-d", default=".")
 @click.option("--metadata_column_conflict_strat", default="reject", type=click.Choice(METADATA_COLUMN_CONFLICT_STRATEGIES))
 def audio_add_duration(dataset_dir: str,
                        metadata_column_conflict_strat: str,
@@ -776,14 +776,14 @@ def audio_add_duration(dataset_dir: str,
 
 
 @audio.command("clip", help="Clip audio data to a specified length (in secs) and update metadata")
+@click.option("--dataset_dir", "-d", default=".")
 @click.option("--clip_duration_secs", type=float, required=True)
-@click.option("--dataset_dir", default=".")
 @click.option("--duration_col_name", default=DURATION_COL_DEFAULT_NAME)
 @click.option("--clip_end_strategy", default="extend", type=click.Choice(CLIP_END_STRAEGIES), help="If a duration is not evenly divisible by clip_duration_secs, what happens to the last clip?")
 @click.option("--force", is_flag=True, help="If not provided, will fail to clip audio that appears to have already been clipped")
 @click.option("--dry_run", is_flag=True)
-def audio_clip_files(clip_duration_secs: float,
-                     dataset_dir: str,
+def audio_clip_files(dataset_dir: str,
+                     clip_duration_secs: float,
                      duration_col_name: str,
                      clip_end_strategy: str,
                      force: bool,
@@ -797,7 +797,7 @@ def audio_clip_files(clip_duration_secs: float,
 
 
 @audio.command("resample", help="Resample an entire audio dataset to a single sample rate")
-@click.option("--dataset_dir", default=".")
+@click.option("--dataset_dir", "-d", default=".")
 @click.option("--target_sr", type=int, required=True, help="In Hz, must NOT be higher than the lowest sample rate of the dataset")
 def audio_resample(dataset_dir: str, target_sr: int):
     dataset = SeraphDataset(dataset_dir)
@@ -830,8 +830,8 @@ def audio_resample(dataset_dir: str, target_sr: int):
 
 # TODO: Support more than just lossless audio and use the expected metadata to drive the logic
 @audio.command("verify", help="Verify that every file in the dataset conforms to the proper media metadata contract")
-@click.option("--dataset_dir", default=".")
-@click.option("--output_format", default="print", type=click.Choice(VERIFY_OUTPUT_FORMATS))
+@click.option("--dataset_dir", "-d", default=".")
+@click.option("--output_format", "-o", default="print", type=click.Choice(VERIFY_OUTPUT_FORMATS))
 @click.option("--check_file_len", is_flag=True, help="Warn of files with no audio length")
 @click.option("--check_has_data", is_flag=True, help="Warn of files with no audio data (i.e., silence)")
 def audio_verify(dataset_dir: str, output_format: str, check_file_len: bool, check_has_data: bool):
@@ -903,7 +903,7 @@ def audio_verify(dataset_dir: str, output_format: str, check_file_len: bool, che
 
 
 @audio.command("prune", help="Remove silent and/or empty audio files from the dataset")
-@click.option("--dataset_dir", default=".")
+@click.option("--dataset_dir", "-d", default=".")
 @click.option("--remove_zero_len", is_flag=True, help="Remove files with duration of 0 sec")
 @click.option("--remove_silence", is_flag=True, help="Remove files that contain only silence")
 def audio_prune(dataset_dir: str, remove_zero_len: bool, remove_silence: bool):

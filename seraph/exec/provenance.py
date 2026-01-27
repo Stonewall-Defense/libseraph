@@ -141,8 +141,8 @@ def prov():
 
 
 @prov.command("show", help="Show provenance updates per version")
-@click.option("--dataset_dir", default=".")
-@click.option("--version")
+@click.option("--dataset_dir", "-d", default=".")
+@click.option("--version", "-v")
 def show_prov(dataset_dir: str, version: Optional[str]):
     dataset = SeraphDataset(dataset_dir)
     prov = _preprocess_prov(dataset, version)
@@ -171,13 +171,13 @@ def show_prov(dataset_dir: str, version: Optional[str]):
 
 
 @prov.command("submit", help="Submit a dataset or update to Prospero")
-@click.option("--dataset_dir", default=".")
-@click.option("--activity_label", required=True)
-@click.option("--activity_keywords", multiple=True)
+@click.option("--dataset_dir", "-d", default=".")
+@click.option("--activity_label", "-l", required=True, help="A human-readable identifier for the activity that generated this dataset/version")
+@click.option("--activity_keywords", "-k", multiple=True, help="Zero or more keywords with which to tag the provenance record")
 @click.option("--prov_url", default="https://prospero.sift.net:8000")
-@click.option("--version")
-@click.option("--force", is_flag=True)
-@click.option("--license", is_flag=True)
+@click.option("--version", "-v")
+@click.option("--force", is_flag=True, help="Force provenance submission, even at risk of creating a duplicate record")
+@click.option("--license", is_flag=True, help="Submit a license record for this dataset")
 def submit_prov(dataset_dir: str,
                 activity_label: str,
                 activity_keywords: tuple[str],

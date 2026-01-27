@@ -126,7 +126,7 @@ def classes():
 
 
 @classes.command("switch", help="Switch the classes from one metadata column to another while keeping the original class data")
-@click.option("--dataset_dir", default=".")
+@click.option("--dataset_dir", "-d", default=".")
 @click.option("--new_class_col", required=True)
 @click.option("--new_name_for_current_class_col", required=True)
 @click.option("--keep_class_col_as_field", default=True)
@@ -185,9 +185,9 @@ def switch_classes(dataset_dir: str,
 
 
 @classes.command("rename", help="Rename one class to a new name not already present in the metadata")
-@click.option("--dataset_dir", default=".")
-@click.option("--new_class_name", required=True)
-@click.option("--old_class_name", required=True)
+@click.option("--dataset_dir", "-d", default=".")
+@click.option("--new_class_name", "-n", required=True)
+@click.option("--old_class_name", "-o", required=True)
 @click.option("--sort_classes", default=True)
 def rename_classes(dataset_dir: str,
                    new_class_name: str,
@@ -231,9 +231,9 @@ def rename_classes(dataset_dir: str,
 
 
 @classes.command("merge", help="Merge one or more classes into a new or existing class")
-@click.option("--dataset_dir", default=".")
-@click.option("--target_class_name", required=True)
-@click.option("--classes_to_merge", required=True, multiple=True)
+@click.option("--dataset_dir", "-d", default=".")
+@click.option("--target_class_name", "-t", required=True)
+@click.option("--classes_to_merge", "-m", required=True, multiple=True)
 @click.option("--sort_classes", default=True)
 def merge_classes(dataset_dir: str,
                   target_class_name: str,
@@ -287,8 +287,8 @@ def merge_classes(dataset_dir: str,
 
 
 @classes.command("regex-merge", help="Merge all classes matching a regex into a new or existing class")
-@click.option("--dataset_dir", default=".")
-@click.option("--target_class_name", required=True)
+@click.option("--dataset_dir", "-d", default=".")
+@click.option("--target_class_name", "-t", required=True)
 @click.option("--sort_classes", default=True)
 @click.option("--dry_run", is_flag=True)
 def merge_classes_regex(dataset_dir: str,
@@ -348,8 +348,8 @@ def merge_classes_regex(dataset_dir: str,
 
 
 @classes.command("drop", help="Drop a class and all records associated with it")
-@click.option("--dataset_dir", default=".")
-@click.option("--class_name", multiple=True)
+@click.option("--dataset_dir", "-d", default=".")
+@click.option("--class_name", "-c", multiple=True)
 @click.option("--sort_classes", default=True)
 def drop_class(dataset_dir: str,
                class_name: tuple[str],
@@ -403,7 +403,7 @@ def drop_class(dataset_dir: str,
 
 
 @classes.command("check-balance", help="Show whole-dataset or per-split/fold class balance")
-@click.option("--dataset_dir", default=".")
+@click.option("--dataset_dir", "-d", default=".")
 @click.option("--len_col_name")
 @click.option("--split_col_name")
 def classes_check_balance(dataset_dir: str, len_col_name: Optional[str], split_col_name: Optional[str]):
