@@ -1,5 +1,5 @@
 [project]
-name = "seraph"
+name = "libseraph"
 version = "v0.1.1"
 
 dependencies = [
