@@ -121,6 +121,8 @@ DURATION_COL_DEFAULT_NAME = "duration_secs"
 def _prune_remote_data(remote_dataset: SeraphDataset,
                        class_select: Optional[list[str]],
                        class_exclude: Optional[list[str]],
+                       split_select: Optional[str],
+                       fold_select: Optional[str],
                        min_length_secs: Optional[int],
                        duration_col_name: Optional[str],
                        ):
@@ -147,7 +149,15 @@ def _prune_remote_data(remote_dataset: SeraphDataset,
     else:
         dur_select_fn = lambda _: True                                          # noqa
 
-    select_fns = [cls_select_fn, dur_select_fn]
+    # Split or fold selection criteria
+    if split_select:
+        fs_select_fn = lambda rec: ((rec.get("split", None) if isinstance(rec, dict) else rec) == split_select) # noqa
+    elif fold_select:
+        fs_select_fn = lambda rec: ((rec.get("fold", None) if isinstance(rec, dict) else rec) == fold_select) # noqa
+    else:
+        fs_select_fn = lambda _: True # noqa
+
+    select_fns = [cls_select_fn, dur_select_fn, fs_select_fn]
 
     # Down-select
     new_metadata = [m for m in metadata_records if all([s(m) for s in select_fns])]
@@ -349,6 +359,8 @@ def _import_audio_dataset(local_dataset: SeraphDataset,
                           subtype_value_merge_strat: AudioBaseMergeStrategy,
                           class_select: Optional[list[str]],
                           class_exclude: Optional[list[str]],
+                          split_select: Optional[str],
+                          fold_select: Optional[str],
                           min_length_secs: Optional[int],
                           duration_col_name: Optional[str],
                           ):
@@ -459,7 +471,7 @@ def _import_audio_dataset(local_dataset: SeraphDataset,
     ####################
     # Actually import the data
     ####################
-    imported_classes = _prune_remote_data(remote_dataset, class_select, class_exclude, min_length_secs, duration_col_name)
+    imported_classes = _prune_remote_data(remote_dataset, class_select, class_exclude, split_select, fold_select, min_length_secs, duration_col_name)
 
     new_class_list, remote_class_mapping = _merge_classes(local_dataset, remote_dataset)
     fieldnames, local_meta_records, remote_meta_records = _merge_metadata(local_dataset, remote_dataset, metadata_field_merge_strat, new_class_list, remote_class_mapping)
@@ -690,6 +702,8 @@ def audio():
 @click.option("--subtype_value_merge_strat", default="reject", type=click.Choice(AUDIO_BASE_MERGE_STRATEGIES), help="What should be done if misc subtype values differ between datasets?")
 @click.option("--class_select", multiple=True, help="One or more classes to cherry-pick from the remote dataset")
 @click.option("--class_exclude", multiple=True, help="One or more classes from the remote dataset to exclude")
+@click.option("--split_select", help="At most one split to import to the exclusion of others")
+@click.option("--fold_select", help="At most one fold to import to the exclusion of others")
 @click.option("--min_length_secs", type=int, help="Files from the import dataset less than this value will be ignored")
 @click.option("--duration_col_name", default=DURATION_COL_DEFAULT_NAME, help="This parameter has no effect if `min_length_secs` is not set")
 def audio_import(dataset_dir: str,
@@ -701,6 +715,8 @@ def audio_import(dataset_dir: str,
                  subtype_value_merge_strat: str,
                  class_select: tuple[str],
                  class_exclude: tuple[str],
+                 split_select: Optional[str],
+                 fold_select: Optional[str],
                  min_length_secs: Optional[int],
                  duration_col_name: str,
                  ):
@@ -718,6 +734,16 @@ def audio_import(dataset_dir: str,
     elif min_length_secs is not None and min_length_secs < 1:
         raise ValueError("Paramater `min_length_secs` must be a positive integer if specified")
 
+    if split_select and fold_select:
+        raise ValueError("You cannot select a split and a fold at the same time")
+    elif fold_select:
+        try:
+            int(fold_select)
+        except ValueError:
+            raise ValueError(f"Invalid fold: {fold_select}")
+    elif split_select and split_select not in ["train", "val", "test"]:
+        raise ValueError(f"Invalid split: {split_select}")
+
     _import_audio_dataset(local_dataset,
                           remote_dataset,
                           metadata_field_merge_strat_fmt,
@@ -727,6 +753,8 @@ def audio_import(dataset_dir: str,
                           subtype_value_merge_strat_fmt,
                           list(class_select) if class_select else None,
                           list(class_exclude) if class_exclude else None,
+                          split_select,
+                          fold_select,
                           min_length_secs,
                           duration_col_name if min_length_secs else None,
                           )

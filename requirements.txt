@@ -10,7 +10,7 @@ torch==2.8.0
 torchaudio==2.8.0
 
 # Certus Requirements
-asaperson==0.1.0
+As-A-Person==0.1.2
 
 # Dev requirements
 coverage==7.13.1
