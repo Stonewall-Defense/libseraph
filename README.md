@@ -24,6 +24,10 @@ pip install .
 conda deactivate
 ```
 
+### Compatibility Note
+
+Other Python ML libraries from Certus Innovations use PyTorch 2.10 and the `torchcodec` library for loading audio. Unfortunately, the `torchcodec` library does not support enough options to save files for `seraph`, so it currently must rely on `torchaudio`, which limits the PyTorch version to 2.8. Using Conda or `venv` this isn't too hard to work around, but we are actively working on a path to upgrade this library for compatibility of our packages.
+
 ## Usage
 
 The most used features of the Seraph tool are:
