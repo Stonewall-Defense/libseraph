@@ -1,18 +1,18 @@
 [project]
 name = "seraph"
-version = "v0.1.0"
+version = "v0.1.1"
 
 dependencies = [
-    "click == 8.2",
-    "numpy == 2.3",
-    "requests == 2.32",
-    "rich == 14.1",
-    "soundfile == 0.13",
-    "tqdm == 4.67",
-    "tinytag == 2.1",
-    "torch == 2.8",
-    "torchaudio == 2.8",
-    "As-A-Person == 0.1",
+    "click ~= 8.2",
+    "numpy ~= 2.3",
+    "requests ~= 2.32",
+    "rich ~= 14.1",
+    "soundfile ~= 0.13",
+    "tqdm ~= 4.67",
+    "tinytag ~= 2.1",
+    "torch ~= 2.8",
+    "torchaudio ~= 2.8",
+    "As-A-Person ~= 0.1",
 ]
 
 authors = [
