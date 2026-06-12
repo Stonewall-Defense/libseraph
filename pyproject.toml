@@ -1,19 +1,6 @@
 [project]
 name = "libseraph"
-version = "v0.1.1"
-
-dependencies = [
-    "click ~= 8.2",
-    "numpy ~= 2.3",
-    "requests ~= 2.32",
-    "rich ~= 14.1",
-    "soundfile ~= 0.13",
-    "tqdm ~= 4.67",
-    "tinytag ~= 2.1",
-    "torch ~= 2.8",
-    "torchaudio ~= 2.8",
-    "As-A-Person ~= 0.1",
-]
+version = "v0.2.0"
 
 authors = [
   { name="Ryan Quinn", email="ryan.quinn@certusinnovations.com" },
@@ -31,6 +18,25 @@ classifiers = [
 ]
 license = "MIT"
 license-files = ["LICENSE*"]
+
+dependencies = [
+    "click ~= 8.3",
+    "numpy ~= 2.4",
+    "requests ~= 2.32",
+    "rich ~= 14.3",
+    "soundfile ~= 0.13",
+    "tqdm ~= 4.67",
+    "tinytag ~= 2.2",
+    "torch ~= 2.10",
+
+    "As-A-Person ~= 0.1",
+    "AudioMlSpecTools ~= 0.8",
+]
+
+[project.optional-dependencies]
+coverage = [
+    "coverage ~= 7.13",
+]
 
 [project.scripts]
 seraph = "seraph.main:cli"

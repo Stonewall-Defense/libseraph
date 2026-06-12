@@ -4,14 +4,17 @@
 import os
 import shutil
 import tempfile
-import warnings
 
 ###############################################################################
 # 3PP Imports
 ###############################################################################
 from click.testing import CliRunner
 import torch
-import torchaudio
+
+###############################################################################
+# Certus Imports
+###############################################################################
+from AudioMlSpecTools import load_wav_as_is, save_wav, AudioEncoding, BitsPerSample
 
 ###############################################################################
 # Helper Imports
@@ -143,12 +146,9 @@ class TestAudioMethods(unittest.TestCase):
 
         target_file = records[0]
         fq_target = os.path.join(fq_data_dir, target_file["filename"])
-        wave, sr = torchaudio.load(fq_target, normalize=True)
+        wave, sr = load_wav_as_is(fq_target)
         wave = torch.zeros_like(wave)
-
-        # This function is deprecated but we will not be upgrading, so it doesn't matter
-        warnings.filterwarnings("ignore", category=UserWarning)
-        torchaudio.save(fq_target, wave, sample_rate=sr, encoding="PCM_S", bits_per_sample=16)
+        save_wav(fq_target, wave, sample_rate=sr, encoding=AudioEncoding.PCM_S, bits_per_sample=BitsPerSample._16)
 
         self.runner.invoke(audio_prune, [
             "--dataset_dir", self.dataset_path,

@@ -14,19 +14,22 @@ Seraph currently supports only audio datasets, as anything else is out of scope 
 
 ## Installation
 
+You can install from PyPI [pip](https://pypi.org/project/pip/):
+
+```bash
+pip install libseraph
+```
+
+### Local Installation
+
 ```bash
 conda create --name seraph python=3.12
 conda activate seraph
 
-pip install -r requirements.txt
 pip install .
 
 conda deactivate
 ```
-
-### Compatibility Note
-
-Other Python ML libraries from Certus Innovations use PyTorch 2.10 and the `torchcodec` library for loading audio. Unfortunately, the `torchcodec` library does not support enough options to save files for `seraph`, so it currently must rely on `torchaudio`, which limits the PyTorch version to 2.8. Using Conda or `venv` this isn't too hard to work around, but we are actively working on a path to upgrade this library for compatibility of our packages.
 
 ## Usage
 
@@ -96,6 +99,9 @@ conda deactivate
 ## Testing
 
 ```bash
+# If needed, install test dependencies
+# pip install .[coverage]
+
 python3 -m coverage run -m unittest discover -s test -p "*_test.py" && python -m coverage report --skip-covered
 python -m coverage html
 ```

@@ -21,8 +21,11 @@ from rich.table import Table
 from tqdm import tqdm
 from tinytag import TinyTag
 import torch
-import torchaudio
 
+###############################################################################
+# Certus Imports
+###############################################################################
+from AudioMlSpecTools import load_wav_as_is, save_wav, resample, AudioEncoding, BitsPerSample
 
 ###############################################################################
 # Local Imports
@@ -297,7 +300,7 @@ def _rewrite_audio_file(fq_input_name: str,
             shutil.copy(fq_input_name, fq_output_name)
         return
 
-    wave, sr = torchaudio.load(fq_input_name, normalize=True)
+    wave, sr = load_wav_as_is(fq_input_name)
 
     # Resample
     final_sr = target_sr or sr
@@ -306,7 +309,7 @@ def _rewrite_audio_file(fq_input_name: str,
         if target_sr > sr:
             raise ValueError(f"Cannot safely upsample file {fq_input_name} from {sr} to {target_sr}")
         elif target_sr != sr:
-            wave = torchaudio.functional.resample(wave, orig_freq=sr, new_freq=target_sr)
+            wave = resample(wave, orig_freq=sr, new_freq=target_sr)
 
     # Channels
     num_channels = wave.size(0)
@@ -321,7 +324,7 @@ def _rewrite_audio_file(fq_input_name: str,
 
     # Save the file
     # TODO: Honor encoding and bits/sample from `seraph.json`
-    torchaudio.save(fq_output_name, wave, sample_rate=final_sr, encoding="PCM_S", bits_per_sample=16)
+    save_wav(fq_output_name, wave, sample_rate=final_sr, encoding=AudioEncoding.PCM_S, bits_per_sample=BitsPerSample._16)
 
 
 def _combine_audio_data_files(local_dataset: SeraphDataset,
@@ -514,7 +517,7 @@ def _import_audio_dataset(local_dataset: SeraphDataset,
 
 def _write_audio_clips(record: FileToClip, data_dir: str):
     fq_input_filename = os.path.join(data_dir, record.filename)
-    audio, sr = torchaudio.load(fq_input_filename, normalize=True)
+    audio, sr = load_wav_as_is(fq_input_filename)
 
     if len(record.clips) == 1:
         fq_output_filename = os.path.join(data_dir, record.clips[0].clip_filename)
@@ -528,7 +531,7 @@ def _write_audio_clips(record: FileToClip, data_dir: str):
         new_wav = audio[:, start_frame:end_frame]
 
         # TODO: Honor formats from `seraph.json` metadata
-        torchaudio.save(fq_output_filename, new_wav, sr, encoding="PCM_S", bits_per_sample=16)
+        save_wav(fq_output_filename, new_wav, sr, encoding=AudioEncoding.PCM_S, bits_per_sample=BitsPerSample._16)
 
     os.unlink(fq_input_filename)
 
@@ -655,24 +658,8 @@ def _clip_audio_files(dataset: SeraphDataset,
 
 
 def _check_has_audio(fq_filename: str):
-    wave, sr = torchaudio.load(fq_filename)
-
-    # Mel Spectrogram
-    mel_spec = torchaudio.transforms.MelSpectrogram(
-        sample_rate=sr,
-        n_fft=1024,
-        n_mels=128,
-        hop_length=512,
-        normalized=False,
-    )
-    mel_output = mel_spec(wave).squeeze()
-    log_mel_output = torchaudio.transforms.AmplitudeToDB(top_db=80)(mel_output)
-
-    # Check spectrogram
-    min_in_val = torch.min(log_mel_output).item()
-    max_in_val = torch.max(log_mel_output).item()
-    in_span = max_in_val - min_in_val
-    return in_span != 0
+    wav, _ = load_wav_as_is(fq_filename)
+    return not torch.allclose(wav, torch.zeros_like(wav))
 
 
 def _fmt_col(val: str | bool | None | int):
@@ -899,7 +886,7 @@ def audio_verify(dataset_dir: str, output_format: str, check_file_len: bool, che
         if expected_meta["bitsPerSample"] != file_meta.bitdepth:
             violation.bit_depth = file_meta.bitdepth
 
-        if check_file_len and (file_meta.duration is None or file_meta.duration < 0.01):
+        if check_file_len and (file_meta.duration is None or file_meta.duration < 0.001):
             violation.is_empty = True
 
         if check_has_data and not _check_has_audio(fq_filename):
