@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: If you use this software, please cite it using these metadata.
+title: Seraph Dataset Management Tool
+abstract: A multimedia dataset management tool for ML training.
+authors:
+  - family-names: Quinn
+    given-names: Ryan
+    orcid: "https://orcid.org/0009-0001-1946-2251"
+version: 0.2.0
+date-released: "2026-06-12"
+identifiers:
+  - description: "The GitHub release URL of tag v0.2.0."
+    type: url
+    value: "https://github.com/Stonewall-Defense/libseraph/releases/tag/v0.2"
+keywords:
+  - "artificial intelligence"
+  - "machine learning"
+  - "multimedia"
+  - "dataset management"
+  - "metadata"
+license: MIT
+repository-code: "https://github.com/Stonewall-Defense/libseraph"

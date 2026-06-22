@@ -1,4 +1,4 @@
-# libseraph
+# Seraph Dataset Management Tool
 
 A hot new dataset management tool that's crazy easy!
 
