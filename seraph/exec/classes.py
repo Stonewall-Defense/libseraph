@@ -449,6 +449,22 @@ def classes_compose(target_dir: str, compose_col: tuple[str], separator_char: st
     write_csv(fq_metadata_file, headers, metadata)
 
 
+@classes.command("sort", help="Sort ")
+@click.option("--dataset_dir", "-d", default=".")
+def sort_classes(dataset_dir: str):
+    # Setup
+    dataset = SeraphDataset(dataset_dir)
+    class_list = dataset.get_classes()
+    class_list.sort()
+
+    change = ChangeRecord(
+        bump_type=VersionBumpType.MAJOR,
+        change_type=ChangeType.CHANGE,
+        message="Sorted classes by name"
+    )
+    dataset.set_classes(class_list, change_record=change).save()
+
+
 ###############################################################################
 # ! Main
 ###############################################################################

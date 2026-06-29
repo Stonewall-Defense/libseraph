@@ -1,6 +1,6 @@
 [project]
 name = "libseraph"
-version = "v0.2.0"
+version = "v0.3.0"
 
 authors = [
   { name="Ryan Quinn", email="ryan.quinn@certusinnovations.com" },
