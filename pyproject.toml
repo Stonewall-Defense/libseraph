@@ -1,6 +1,6 @@
 [project]
 name = "libseraph"
-version = "v0.3.1"
+version = "v0.3.2"
 
 authors = [
   { name="Ryan Quinn", email="ryan.quinn@certusinnovations.com" },
@@ -21,7 +21,7 @@ license-files = ["LICENSE*"]
 
 dependencies = [
     "click ~= 8.3",
-    "numpy ~= 2.4",
+    "numpy ~= 2.5",
     "requests ~= 2.32",
     "rich ~= 14.3",
     "soundfile ~= 0.13",
@@ -30,7 +30,7 @@ dependencies = [
     "torch ~= 2.10",
 
     "As-A-Person ~= 0.1",
-    "AudioMlSpecTools ~= 0.8",
+    "AudioMlSpecTools ~= 0.11",
 ]
 
 [project.optional-dependencies]

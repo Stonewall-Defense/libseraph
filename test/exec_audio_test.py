@@ -14,7 +14,7 @@ import torch
 ###############################################################################
 # Certus Imports
 ###############################################################################
-from AudioMlSpecTools import load_wav_as_is, save_wav, AudioEncoding, BitsPerSample
+from AudioMlSpecTools import load_wav, save_wav, AudioEncoding, BitsPerSample
 
 ###############################################################################
 # Helper Imports
@@ -146,7 +146,7 @@ class TestAudioMethods(unittest.TestCase):
 
         target_file = records[0]
         fq_target = os.path.join(fq_data_dir, target_file["filename"])
-        wave, sr = load_wav_as_is(fq_target)
+        wave, sr = load_wav(fq_target)
         wave = torch.zeros_like(wave)
         save_wav(fq_target, wave, sample_rate=sr, encoding=AudioEncoding.PCM_S, bits_per_sample=BitsPerSample._16)
 

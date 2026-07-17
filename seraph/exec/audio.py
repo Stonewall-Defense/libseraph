@@ -25,7 +25,7 @@ import torch
 ###############################################################################
 # Certus Imports
 ###############################################################################
-from AudioMlSpecTools import load_wav_as_is, save_wav, resample, AudioEncoding, BitsPerSample
+from AudioMlSpecTools import load_wav, save_wav, Resample, AudioEncoding, BitsPerSample
 
 ###############################################################################
 # Local Imports
@@ -300,16 +300,23 @@ def _rewrite_audio_file(fq_input_name: str,
             shutil.copy(fq_input_name, fq_output_name)
         return
 
-    wave, sr = load_wav_as_is(fq_input_name)
+    wave, sr = load_wav(fq_input_name)
 
     # Resample
     final_sr = target_sr or sr
 
+    resampler_cache: dict[int, Resample] = {}
+
     if target_sr is not None:
         if target_sr > sr:
             raise ValueError(f"Cannot safely upsample file {fq_input_name} from {sr} to {target_sr}")
-        elif target_sr != sr:
-            wave = resample(wave, orig_freq=sr, new_freq=target_sr)
+
+        try:
+            resampler = resampler_cache[sr]
+        except KeyError:
+            resampler = Resample(sr, target_sr)
+            resampler_cache[sr] = resampler
+        wave = resampler(wave)
 
     # Channels
     num_channels = wave.size(0)
@@ -517,7 +524,7 @@ def _import_audio_dataset(local_dataset: SeraphDataset,
 
 def _write_audio_clips(record: FileToClip, data_dir: str):
     fq_input_filename = os.path.join(data_dir, record.filename)
-    audio, sr = load_wav_as_is(fq_input_filename)
+    audio, sr = load_wav(fq_input_filename)
 
     if len(record.clips) == 1:
         fq_output_filename = os.path.join(data_dir, record.clips[0].clip_filename)
@@ -658,7 +665,7 @@ def _clip_audio_files(dataset: SeraphDataset,
 
 
 def _check_has_audio(fq_filename: str):
-    wav, _ = load_wav_as_is(fq_filename)
+    wav, _ = load_wav(fq_filename)
     return not torch.allclose(wav, torch.zeros_like(wav))
 
 
