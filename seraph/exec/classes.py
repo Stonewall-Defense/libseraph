@@ -454,15 +454,22 @@ def classes_compose(target_dir: str, compose_col: tuple[str], separator_char: st
 def sort_classes(dataset_dir: str):
     # Setup
     dataset = SeraphDataset(dataset_dir)
+    _, metadata = dataset.get_metadata()
     class_list = dataset.get_classes()
+
     class_list.sort()
+
+    for entry in metadata:
+        entry_class_name = entry["class_name"]
+        entry_class_id = class_list.index(entry_class_name)
+        entry["class_id"] = str(entry_class_id)
 
     change = ChangeRecord(
         bump_type=VersionBumpType.MAJOR,
         change_type=ChangeType.CHANGE,
         message="Sorted classes by name"
     )
-    dataset.set_classes(class_list, change_record=change).save()
+    dataset.set_multiple(classes=class_list, metadata_records=metadata, change_records=[change]).save()
 
 
 ###############################################################################
