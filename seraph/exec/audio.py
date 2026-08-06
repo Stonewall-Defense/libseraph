@@ -664,9 +664,13 @@ def _clip_audio_files(dataset: SeraphDataset,
         write_csv("clipped_metadata.csv", headers, clipped_metadata)
 
 
-def _check_has_audio(fq_filename: str):
+def _has_bad_audio(fq_filename: str, remove_silence: bool, remove_const: bool, remove_nan: bool):
     wav, _ = load_wav(fq_filename)
-    return not torch.allclose(wav, torch.zeros_like(wav))
+
+    is_silent = remove_silence and torch.allclose(wav, torch.zeros_like(wav))
+    is_const = remove_const and torch.allclose(wav, wav[0][0])
+    is_nan = remove_nan and torch.any(torch.isnan(wav)).item()
+    return is_silent or is_const or is_nan
 
 
 def _fmt_col(val: str | bool | None | int):
@@ -896,7 +900,7 @@ def audio_verify(dataset_dir: str, output_format: str, check_file_len: bool, che
         if check_file_len and (file_meta.duration is None or file_meta.duration < 0.001):
             violation.is_empty = True
 
-        if check_has_data and not _check_has_audio(fq_filename):
+        if check_has_data and _has_bad_audio(fq_filename, True, True, True):
             violation.no_audio = True
 
         if violation.has_violation():
@@ -928,7 +932,14 @@ def audio_verify(dataset_dir: str, output_format: str, check_file_len: bool, che
 @click.option("--dataset_dir", "-d", default=".")
 @click.option("--remove_zero_len", is_flag=True, help="Remove files with duration of 0 sec")
 @click.option("--remove_silence", is_flag=True, help="Remove files that contain only silence")
-def audio_prune(dataset_dir: str, remove_zero_len: bool, remove_silence: bool):
+@click.option("--remove_const", is_flag=True, help="Remove files that contain only constant values")
+@click.option("--remove_nan", is_flag=True, help="Remove files that contain only NAN values")
+def audio_prune(dataset_dir: str,
+                remove_zero_len: bool,
+                remove_silence: bool,
+                remove_const: bool,
+                remove_nan: bool,
+                ):
     dataset = SeraphDataset(dataset_dir)
     data_dir = dataset.get_data_dir()
     _, original_metadata_records = dataset.get_metadata()
@@ -944,10 +955,10 @@ def audio_prune(dataset_dir: str, remove_zero_len: bool, remove_silence: bool):
         fq_filename = os.path.join(data_dir, filename)
         file_meta = TinyTag.get(fq_filename)
 
-        is_zero_len = remove_zero_len and (file_meta.duration is None or file_meta.duration < 0.01)
-        is_silence = remove_silence and not _check_has_audio(fq_filename)
+        is_zero_len = remove_zero_len and (file_meta.duration is None or file_meta.duration < 0.001)
+        only_bad_values = _has_bad_audio(fq_filename, remove_silence, remove_const, remove_nan)
 
-        if is_zero_len or is_silence:
+        if is_zero_len or only_bad_values:
             os.unlink(fq_filename)
         else:
             new_metadata_records.append(record)
